@@ -1,0 +1,38 @@
+# configs/edrrednet.yaml
+# EDR-REDNet Training Config — Giai đoạn DEBUG (mbs=8, 2000 iter)
+# Tăng dần: mbs=16, max_iterations=20000 (Pilot) → 92994 (Final)
+
+trainer: edrrednet
+seed: 1339
+datafolder: data
+
+# Optimizer
+optimizer: adam
+lr: 9.583e-05
+adam_b1: 0.9
+adam_b2: 0.999
+
+# Loss weights (V1: Charbonnier + SobelEdgeLoss)
+loss_alpha: 0.1      # SobelEdgeLoss weight — ≈ 0.1
+loss_beta: 0.0       # Perceptual VGG — BẬT khi ablation (loss_beta: 0.01)
+loss_gamma: 0.0      # HU Loss        — BẬT sau khi định nghĩa inverse norm
+
+# Architecture
+num_edge_blocks: 2   # Số EdgeDilatedResidualBlock tại bottleneck (dilation 2,3)
+
+# Training — 3 giai đoạn:
+# [DEBUG]  mbs=8,  max_iterations=2000,  data_subset=0.1  ← hiện tại
+# [PILOT]  mbs=16, max_iterations=20000, data_subset=0.5
+# [FINAL]  mbs=16, max_iterations=92994, data_subset=1.0
+mbs: 16
+max_iterations: 40000
+data_subset: 1.0
+patchsize: 128
+iterations_before_val: 1000
+valsamples: 8
+
+# Data
+data_norm: meanstd
+num_workers: 4       # Dùng 4 khi train trên Kaggle, tăng lên 8 nếu local
+cuda: true
+devices: 0

@@ -1,0 +1,38 @@
+# configs/edrcnn10.yaml
+# EDR-CNN10 Training Config
+# Áp dụng FixedSobelLayer + EdgeDilatedResidualBlock + CombinedLoss vào CNN10
+
+trainer: edrcnn10
+seed: 1339
+datafolder: data
+
+# Optimizer — giữ lr từ CNN10 gốc (đã tune)
+optimizer: adam
+lr: 0.00015837
+adam_b1: 0.9
+adam_b2: 0.999
+
+# Loss weights
+loss_alpha: 0.1      # SobelEdgeLoss weight
+loss_beta: 0.0       # Perceptual VGG — TẮT
+loss_gamma: 0.0      # HU Loss — TẮT
+
+# Architecture
+num_edge_blocks: 2   # Số EdgeDilatedResidualBlock tại bottleneck (dilation 2, 3)
+
+# Training — 3 giai đoạn:
+# [DEBUG]  mbs=8,  max_iterations=2000,  data_subset=0.1  ← hiện tại
+# [PILOT]  mbs=32, max_iterations=10000, data_subset=0.5
+# [FINAL]  mbs=32, max_iterations=31000, data_subset=1.0
+mbs: 8
+max_iterations: 2000
+data_subset: 0.1
+patchsize: 92
+iterations_before_val: 500
+valsamples: 8
+
+# Data
+data_norm: meanstd
+num_workers: 2
+cuda: true
+devices: 0

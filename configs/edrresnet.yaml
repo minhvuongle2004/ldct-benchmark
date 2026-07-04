@@ -1,0 +1,37 @@
+# configs/edrresnet.yaml
+# EDR-ResNet Training Config — Variant D (Full: FixedSobel + EdgeDilated + SobelLoss)
+
+trainer: edrresnet
+seed: 1339
+datafolder: data
+
+# Optimizer — giữ nguyên như ResNet gốc
+optimizer: adam
+lr: 0.0001
+adam_b1: 0.9
+adam_b2: 0.999
+
+# Loss weights (Charbonnier + SobelEdgeLoss)
+loss_alpha: 0.1      # SobelEdgeLoss weight
+loss_beta:  0.0      # Perceptual VGG — TẮT
+loss_gamma: 0.0      # HU Loss        — TẮT
+
+# Architecture
+num_edge_blocks: 2   # 2 × EdgeDilatedResidualBlock (dilation 2, 3) ở giữa backbone
+use_sobel_input: true
+
+# Training
+# [DEBUG]  mbs=8,  max_iterations=2000,  data_subset=0.1
+# [FINAL]  mbs=32, max_iterations=20000, data_subset=1.0
+mbs: 8
+max_iterations: 2000
+data_subset: 0.1
+patchsize: 64                  # Giữ nguyên patch size của ResNet gốc
+iterations_before_val: 500
+valsamples: 8
+
+# Data
+data_norm: meanstd
+num_workers: 2
+cuda: true
+devices: 0

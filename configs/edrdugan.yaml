@@ -1,0 +1,42 @@
+# EDR-DUGAN Training Config
+# Generator: EDR-REDCNN (FixedSobelLayer + EdgeDilatedResidualBlock + RED-CNN backbone)
+# Discriminators: 2 × UNet (image domain + gradient domain), Spectral Norm, CutMix
+
+trainer: edrdugan
+
+# ── Optimizer ─────────────────────────────────────────────────────────────────
+optimizer: adam
+lr: 1.2436216786633454e-05    # Giữ nguyên LR của DUGAN gốc
+adam_b1: 0.653411010331042    # DUGAN dùng β1 thấp hơn thông thường
+adam_b2: 0.999
+
+# ── Training ──────────────────────────────────────────────────────────────────
+max_iterations: 50000
+iterations_before_val: 1000
+mbs: 16                       # Giảm mbs (trước là 64 bị OOM) vì DUGAN train 3 model song song
+patchsize: 128                # Giữ nguyên DUGAN gốc (RED-CNN valid padding: 128→108)
+num_workers: 4
+
+# ── DUGAN-specific ────────────────────────────────────────────────────────────
+n_d_train: 2                  # Train D 2 lần/iteration G (DUGAN gốc)
+lam_adv: 0.080335201069619    # Adversarial loss weight
+lam_px_im: 1.0                # Pixelwise image loss weight
+lam_px_grad: 27.81452397771084  # Gradient loss weight (rất cao — DUGAN design)
+lam_cutmix: 2.647865385857211
+cutmix_prob: 0.5
+cutmix_warmup_iter: 5000
+
+# ── EDR-specific ──────────────────────────────────────────────────────────────
+num_edge_blocks: 2
+use_sobel_input: true
+
+# ── Data ──────────────────────────────────────────────────────────────────────
+data_norm: meanstd
+data_subset: 1.0
+eval_patchsize: 128
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+cuda: true
+devices: 0
+dryrun: true
+valsamples: 8

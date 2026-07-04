@@ -1,0 +1,37 @@
+# configs/edrqae.yaml
+# EDR-QAE Training Config — Variant D (Full: FixedSobel + EdgeDilated + SobelLoss)
+
+trainer: edrqae
+seed: 1339
+datafolder: data
+
+# Optimizer — giữ nguyên LR của QAE gốc
+optimizer: adam
+lr: 2.8427860979114494e-05
+adam_b1: 0.9
+adam_b2: 0.999
+
+# Loss weights
+loss_alpha: 0.1    # SobelEdgeLoss weight
+loss_beta:  0.0    # Perceptual VGG — TẮT
+loss_gamma: 0.0    # HU Loss        — TẮT
+
+# Architecture
+num_edge_blocks: 2     # 2 × EdgeDilatedResidualBlock (dilation 2, 3) ở bottleneck
+use_sobel_input: true
+
+# Training
+# [DEBUG]  mbs=16, max_iterations=500,   data_subset=0.1
+# [FINAL]  mbs=64, max_iterations=50000, data_subset=1.0
+mbs: 16
+max_iterations: 500
+data_subset: 0.1
+patchsize: 36              # QUAN TRỌNG: giữ nguyên 36 của QAE gốc (valid padding)
+iterations_before_val: 200
+valsamples: 8
+
+# Data
+data_norm: meanstd
+num_workers: 2
+cuda: true
+devices: 0
