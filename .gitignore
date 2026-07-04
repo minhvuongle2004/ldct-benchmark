@@ -1,0 +1,67 @@
+env/
+*.egg-info/
+build/
+*.pyc
+
+# ─── Model checkpoints (lớn, lưu trên Kaggle/Drive) ───
+results/**/*.pt
+results/**/*.pth
+
+# ─── Large binary files ───
+results/**/*.zip
+*.crdownload
+
+# ─── Temporary / generated files ───
+*.tiff
+denoised_image.tiff
+
+# ─── Debug outputs (không cần lên GitHub) ───
+results/**/*_debug.csv
+
+# ─── WandB logs ───
+wandb/
+
+# ─── Stress test data (ảnh DICOM thô) ───
+stress_test_data/
+
+# ─── Build / package artifacts ───
+.idea/
+site/
+ldct_benchmark.egg-info/
+dist/
+
+# ─── Python cache ───
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.psd
+.coverage
+
+# ─── Virtual environments ───
+venv/
+ENV/
+env/
+.venv
+
+# ─── IDE ───
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── OS ───
+.DS_Store
+Thumbs.db
+
+# ─── Logs ───
+*.log
+
+# ─── Data (lưu local, không push) ───
+ldct-data/
+result/
+AAPM-Mayo Clinic/
+AAPM-Mayo Clinic.zip
+data/
