@@ -59,13 +59,20 @@ code_5 = """# 5. BẮT ĐẦU TRAIN EDR-REDNet 🚀
 # Dùng python -m để sửa lỗi ModuleNotFoundError, --dryrun để bỏ qua đăng nhập Wandb
 !python -m ldctbench.scripts.train --config configs/edrrednet.yaml --dryrun"""
 
+code_6 = """# 6. ÉP KAGGLE HIỂN THỊ FILE TRỌNG SỐ (.pt)
+# Khi chạy "Save & Run All", Kaggle thường tự động ẩn/xóa các file trong thư mục ẩn hoặc bị gitignore.
+# Lệnh này sẽ lôi cổ file trọng số ra thư mục gốc để đảm bảo 100% anh tải về được!
+!cp /kaggle/working/ldct-benchmark/wandb/*/files/*.pt /kaggle/working/
+!ls -lh /kaggle/working/*.pt"""
+
 nb['cells'] = [
     nbf.v4.new_markdown_cell(text_1),
     nbf.v4.new_code_cell(code_1),
     nbf.v4.new_code_cell(code_2),
     nbf.v4.new_code_cell(code_3),
     nbf.v4.new_code_cell(code_4),
-    nbf.v4.new_code_cell(code_5)
+    nbf.v4.new_code_cell(code_5),
+    nbf.v4.new_code_cell(code_6)
 ]
 
 with io.open('Train_EDR_REDNet_Kaggle.ipynb', 'w', encoding='utf-8') as f:
