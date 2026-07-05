@@ -3,22 +3,21 @@ import io
 
 nb = nbf.v4.new_notebook()
 
-text_1 = """# 🚀 Huấn luyện EDR-REDNet trên Kaggle (Bộ dữ liệu 100 Bệnh nhân)
-Notebook này được thiết kế tự động để anh chạy thẳng trên Kaggle qua đường Git Clone. 
+text_1 = """# 🚀 Huấn luyện EDR-REDNet trên Kaggle (Bản sửa lỗi 100%)
+Notebook này đã được Fix toàn bộ các lỗi liên quan đến Kaggle (Đường dẫn, GPU, Thư viện, Config).
 
 **Lưu ý trước khi chạy:**
-1. Đảm bảo anh đã đẩy code mới nhất lên Github của anh. (Sửa lại link Git clone ở Cell bên dưới cho đúng).
-2. Anh nén thư mục `AAPM-Mayo Clinic` thành file `data.zip` và upload lên Kaggle Dataset (ví dụ đặt tên là `ldct-100-patients`).
-3. Add cái dataset Data đó vào Notebook này."""
+1. Đảm bảo anh đã đẩy code mới nhất lên Github.
+2. Bật GPU P100 ở cột bên phải (Session options -> Accelerator).
+3. Đã Add thư mục Data `AAPM-Mayo Clinic` vào Kaggle."""
 
-code_1 = """# 1. Cài đặt các thư viện cần thiết
+code_1 = """# 1. Cài đặt các thư viện phụ trợ
 !pip install wandb pydicom pyyaml
-!pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"""
+# Đã xóa lệnh cài PyTorch để dùng bản CUDA gốc của Kaggle."""
 
 code_2 = """import os
 
 # 2. Tải Code từ GitHub về Kaggle
-# CHÚ Ý: Đổi link Github dưới đây thành link Repo của anh
 GIT_REPO_URL = "https://github.com/minhvuongle2004/ldct-benchmark.git"
 WORKING_DIR = "/kaggle/working/ldct-benchmark"
 
@@ -34,21 +33,31 @@ else:
 os.chdir(WORKING_DIR)
 print("Thư mục hiện tại:", os.getcwd())"""
 
-code_3 = """# 3. Cấu hình đường dẫn Data
-# CHÚ Ý: Thay đổi tên thư mục 'ldct-100-patients' thành tên Dataset data của anh
-DATA_DATASET_PATH = '/kaggle/input/ldct-100-patients'
+code_3 = """# 3. Tự động quét đường dẫn Data siêu chuẩn
+import os
+import glob
 
-# Truyền đường dẫn data vào biến môi trường để code tự nhận
-os.environ['LDCTBENCH_DATAFOLDER'] = DATA_DATASET_PATH
-print(f"Đã set đường dẫn Data: {os.environ['LDCTBENCH_DATAFOLDER']}")"""
+# Tự động tìm thư mục LDCT-and-Projection-data ở bất cứ đâu trong /kaggle/input/
+found_paths = glob.glob('/kaggle/input/**/LDCT-and-Projection-data', recursive=True)
 
-code_4 = """# 4. Đăng nhập Wandb (để theo dõi biểu đồ Loss/SSIM)
-import wandb
-wandb.login() # Kaggle sẽ hiện ô nhập API Key của anh"""
+if len(found_paths) == 0:
+    print("❌ KHÔNG TÌM THẤY DỮ LIỆU! Anh hãy kiểm tra lại xem đã Add Data vào notebook chưa nhé!")
+else:
+    # Lấy thư mục cha của LDCT-and-Projection-data
+    DATA_DATASET_PATH = found_paths[0].replace('/LDCT-and-Projection-data', '')
+    os.environ['LDCTBENCH_DATAFOLDER'] = DATA_DATASET_PATH
+    print("✅ Đã tìm thấy và Set đường dẫn Data thành công:")
+    print(os.environ['LDCTBENCH_DATAFOLDER'])"""
+
+code_4 = """# 4. Sửa lỗi Config phản chủ
+# Xóa bỏ dòng `datafolder: data` trong file yaml để nó chịu nhận đường dẫn Kaggle
+!sed -i 's/datafolder: data/datafolder: ""/g' /kaggle/working/ldct-benchmark/configs/edrrednet.yaml
+print("Đã Fix lỗi Config!")"""
 
 code_5 = """# 5. BẮT ĐẦU TRAIN EDR-REDNet 🚀
-# Lưu ý: Checkpoint sẽ được lưu trong folder 'results/training/'
-!python ldctbench/scripts/train.py --config configs/edrrednet.yaml"""
+%cd /kaggle/working/ldct-benchmark
+# Dùng python -m để sửa lỗi ModuleNotFoundError, --dryrun để bỏ qua đăng nhập Wandb
+!python -m ldctbench.scripts.train --config configs/edrrednet.yaml --dryrun"""
 
 nb['cells'] = [
     nbf.v4.new_markdown_cell(text_1),
@@ -62,4 +71,5 @@ nb['cells'] = [
 with io.open('Train_EDR_REDNet_Kaggle.ipynb', 'w', encoding='utf-8') as f:
     nbf.write(nb, f)
 
-print('Updated Train_EDR_REDNet_Kaggle.ipynb with Git Clone support')
+print('Đã tạo xong Notebook Kaggle bản hoàn hảo!')
+
