@@ -218,7 +218,7 @@ with tab_ablation:
 
     x_abl_t, y_abl_t = get_single_slice(dataset, global_pat_idx, abl_sl)
     x_abl = x_abl_t.unsqueeze(0).unsqueeze(0).to(device)
-    y_abl_np = y_abl_t.numpy()
+    y_abl_np = y_abl_t.cpu().numpy()
 
     # ---- ROI Selection UI ----
     st.markdown("### 🎯 Chọn Vùng Quan Tâm (ROI) để tính CNR")
@@ -371,7 +371,7 @@ with tab_infer:
         selected_slice = st.sidebar.slider("2. Chọn Lát cắt (Slice)", 0, n_slices - 1, int(n_slices/2))
         x_raw_t, y_raw_t = get_single_slice(dataset, global_pat_idx, selected_slice)
         x_raw = x_raw_t.unsqueeze(0).unsqueeze(0).to(device)
-        y_raw = y_raw_t.numpy()
+        y_raw = y_raw_t.cpu().numpy()
         target_available = True
     else:
         uploaded_file = st.sidebar.file_uploader("1. Chọn file LDCT (Đầu vào)", type=["dcm"])
@@ -645,7 +645,7 @@ with tab_paper:
 
         x_z_t, y_z_t = get_single_slice(dataset, global_pat_idx, z_sl)
         x_z = x_z_t.unsqueeze(0).unsqueeze(0).to(device)
-        y_z_np = y_z_t.numpy()
+        y_z_np = y_z_t.cpu().numpy()
 
         with st.spinner("Đang chạy inference cho Zoom..."):
             zoom_imgs = {}
