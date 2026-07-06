@@ -54,15 +54,22 @@ code_4 = """# 4. Sửa lỗi Config phản chủ
 !sed -i 's/datafolder: data/datafolder: ""/g' /kaggle/working/ldct-benchmark/configs/edrrednet.yaml
 print("Đã Fix lỗi Config!")"""
 
-code_5 = """# 5. BẮT ĐẦU TRAIN EDR-REDNet 🚀
+code_5 = """# 5. BẮT ĐẦU TRAIN EDR-REDNet VỚI NHIỀU SEED 🚀
 %cd /kaggle/working/ldct-benchmark
-# Dùng python -m để sửa lỗi ModuleNotFoundError, --dryrun để bỏ qua đăng nhập Wandb
-!python -m ldctbench.scripts.train --config configs/edrrednet.yaml --dryrun"""
+# Chạy vòng lặp Train cho 2 seed: 42 và 2024 liên tiếp
+!for SEED in 42 2024; do \\
+    echo "========================================="; \\
+    echo "🚀 BẮT ĐẦU TRAIN VỚI SEED: $SEED"; \\
+    echo "========================================="; \\
+    sed -i "s/seed: .*/seed: $SEED/g" configs/edrrednet.yaml; \\
+    python -m ldctbench.scripts.train --config configs/edrrednet.yaml --dryrun; \\
+    cp wandb/*/files/best_SSIM.pt /kaggle/working/seed${SEED}_best_SSIM.pt; \\
+    rm -rf wandb/*; \\
+done
+"""
 
-code_6 = """# 6. ÉP KAGGLE HIỂN THỊ FILE TRỌNG SỐ (.pt)
-# Khi chạy "Save & Run All", Kaggle thường tự động ẩn/xóa các file trong thư mục ẩn hoặc bị gitignore.
-# Lệnh này sẽ lôi cổ file trọng số ra thư mục gốc để đảm bảo 100% anh tải về được!
-!cp /kaggle/working/ldct-benchmark/wandb/*/files/*.pt /kaggle/working/
+code_6 = """# 6. KIỂM TRA FILE TRỌNG SỐ (.pt)
+# File trọng số của các Seed sẽ được đổi tên và cất an toàn ở thư mục gốc
 !ls -lh /kaggle/working/*.pt"""
 
 nb['cells'] = [
