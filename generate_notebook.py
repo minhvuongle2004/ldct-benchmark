@@ -66,10 +66,12 @@ code_5 = """# 6. BẮT ĐẦU TRAIN EDR-REDNet VỚI SEED ĐÃ CHỌN 🚀
 # Bắt đầu train
 !python -m ldctbench.scripts.train --config configs/edrrednet.yaml --dryrun"""
 
-code_6 = """# 7. LƯU FILE TRỌNG SỐ (.pt)
+code_6 = """# 7. LƯU FILE TRỌNG SỐ VÀ KẾT QUẢ (.pt, .csv)
 # Lấy file ra ngoài gốc kèm theo tiền tố seed để dễ phân biệt
 !cp /kaggle/working/ldct-benchmark/wandb/*/files/*_best_SSIM.pt /kaggle/working/seed{TRAIN_SEED}_best_SSIM.pt
-!ls -lh /kaggle/working/*.pt"""
+!cp /kaggle/working/ldct-benchmark/wandb/*/files/Metrics.csv /kaggle/working/seed{TRAIN_SEED}_Metrics.csv
+!cp /kaggle/working/ldct-benchmark/wandb/*/files/Losses.csv /kaggle/working/seed{TRAIN_SEED}_Losses.csv
+!ls -lh /kaggle/working/"""
 
 nb['cells'] = [
     nbf.v4.new_markdown_cell(text_1),
