@@ -92,7 +92,8 @@ class BaseTrainer(object):
     def train(self):
         """Chạy train qua toàn bộ dataloader["train"] một lần."""
         self.model.train()
-        for batch in tqdm(self.dataloader["train"], desc="Train: "):
+        # FIX KAGGLE OOM: Giảm tần suất in của tqdm xuống 60s/lần để tránh tràn RAM bộ đệm IOStream
+        for batch in tqdm(self.dataloader["train"], desc="Train: ", mininterval=60.0, maxinterval=120.0):
             batch = {
                 k: Variable(v).to(self.dev, non_blocking=True) for k, v in batch.items()
             }
@@ -104,8 +105,9 @@ class BaseTrainer(object):
         """Chạy validate trên dataloader["val"] và tính metric."""
         self.images = {}
         self.model.eval()
+        # FIX KAGGLE OOM: Giảm tần suất in của tqdm xuống 60s/lần
         for batch_idx, batch in enumerate(
-            tqdm(self.dataloader["val"], desc="Validate: ")
+            tqdm(self.dataloader["val"], desc="Validate: ", mininterval=60.0, maxinterval=120.0)
         ):
             batch = {
                 k: Variable(v).to(self.dev, non_blocking=True) for k, v in batch.items()
