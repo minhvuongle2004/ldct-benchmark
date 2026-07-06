@@ -178,6 +178,7 @@ else:
 
 code_6 = """import glob
 import os
+import yaml
 os.environ["WANDB_MODE"] = "offline"
 
 assert data_path is not None, "❌ Chạy Cell 2 trước!"
@@ -189,49 +190,33 @@ print(f"✅ Datafolder: {data_path}")
 # ==========================================
 TRAIN_SEED = 42
 
-resume_config = ""
-max_iterations = 45000
+with open("configs/edrrednet.yaml", "r", encoding="utf-8") as f:
+    config = yaml.safe_load(f)
+
+# Cập nhật các thông số động cho Kaggle
+config["seed"] = TRAIN_SEED
+config["datafolder"] = data_path
+config["num_workers"] = 4
+config["devices"] = [0, 1]  # Tận dụng 2 card T4x2
 
 checkpoints = glob.glob(f"/kaggle/input/**/seed{TRAIN_SEED}_best_*.pt", recursive=True)
 if checkpoints:
     ckpt_path = checkpoints[0]
-    resume_config = f"resume: '{ckpt_path}'"
-    max_iterations = 93000
+    config["resume"] = ckpt_path
+    
+    # Tự động tăng max_iterations lên để chạy tiếp
+    config["max_iterations"] = int(config.get("max_iterations", 40000) * 2.325)
     print(f"\\n✅ TÌM THẤY CHECKPOINT CŨ: {ckpt_path}")
-    print(f"   -> Sẽ Resume và train tiếp đến {max_iterations} iterations.")
+    print(f"   -> Sẽ Resume và train tiếp đến {config['max_iterations']} iterations.")
 else:
     print("\\nℹ️ KHÔNG TÌM THẤY CHECKPOINT CŨ.")
-    print(f"   -> Sẽ Train từ đầu đến {max_iterations} iterations (~9.5h).")
+    print(f"   -> Sẽ Train từ đầu đến {config.get('max_iterations', 40000)} iterations.")
 
-config = f\"\"\"trainer: edrrednet
-seed: {TRAIN_SEED}
-datafolder: {data_path}
-{resume_config}
-optimizer: adam
-lr: 9.583e-05
-adam_b1: 0.9
-adam_b2: 0.999
-loss_alpha: 0.3
-loss_beta: 0.05
-loss_gamma: 0.01
-num_edge_blocks: 2
-mbs: 16
-max_iterations: {max_iterations}
-data_subset: 1.0
-patchsize: 128
-iterations_before_val: 1000
-valsamples: 8
-data_norm: meanstd
-num_workers: 4
-cuda: true
-devices: [0, 1]
-\"\"\"
-
-with open("configs/edrrednet_kaggle.yaml", "w", encoding="utf-8") as f:
-    f.write(config)
+with open("configs/edrrednet.yaml", "w", encoding="utf-8") as f:
+    yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
 
 print(f"\\nConfig saved. Bắt đầu training seed {TRAIN_SEED}...")
-!python -m ldctbench.scripts.train --config configs/edrrednet_kaggle.yaml --dryrun"""
+!python -m ldctbench.scripts.train --config configs/edrrednet.yaml --dryrun"""
 
 code_7 = """import glob, shutil, os
 
