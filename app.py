@@ -60,10 +60,10 @@ def _setup_variant_wandb(run_name, ckpt_path, cfg_path, overrides=None):
 
 @st.cache_resource
 def setup_environment():
-    # Variant D
-    checkpoint_path = r"results\training\EDR-RedCnn\VariantD\seed2024\seed2024_best_SSIM.pt"
+    # Variant D (Mô hình mới nhất)
+    checkpoint_path = r"best_SSIM.pt"
     cfg = r"configs\edrrednet.yaml"
-    _setup_variant_wandb("edr_redcnn_seed2024", checkpoint_path, cfg)
+    _setup_variant_wandb("edr_redcnn_latest", checkpoint_path, cfg)
     # Variant B
     _setup_variant_wandb("edr_variant_b",
         r"results\training\EDR-RedCnn\VariantB\Seed1339\variantB_seed1339_best_SSIM.pt", cfg,
@@ -76,7 +76,13 @@ def setup_environment():
 
 @st.cache_resource
 def load_dataset():
-    return TestData("ldct-data", "meanstd")
+    # Sửa lại đường dẫn data thành thư mục thực tế đang có trên máy
+    return TestData("AAPM-Mayo Clinic", "meanstd")
+
+@st.cache_resource(max_entries=2)
+def get_patient_batch(_dataset, pat_idx):
+    """Cache the patient loading to avoid OOM when moving sliders."""
+    return _dataset[pat_idx]
 
 @st.cache_resource
 def load_networks():
@@ -86,7 +92,7 @@ def load_networks():
     networks["redcnn"] = load_model("redcnn", eval=True).to(dev)
     networks["variant_a"] = networks["redcnn"]
     # Variant D — Full EDR-REDNet
-    net_d = setup_trained_model(run_name="edr_redcnn_seed2024", device=dev,
+    net_d = setup_trained_model(run_name="edr_redcnn_latest", device=dev,
         network_name="Model", state_dict="best_SSIM", eval=True)
     networks["edr_redcnn"] = net_d
     networks["variant_d"] = net_d
@@ -188,7 +194,7 @@ with tab_ablation:
         patient_names_abl = [p["info"]["id"] for p in dataset.samples]
         abl_pat = st.selectbox("Chọn bệnh nhân", range(len(patient_names_abl)),
                                format_func=lambda i: patient_names_abl[i], key="abl_pat")
-    abl_batch = dataset[abl_pat]
+    abl_batch = get_patient_batch(dataset, abl_pat)
     n_sl = abl_batch["info"]["n_slices"]
     with col_ctrl2:
         abl_sl = st.slider("Chọn lát cắt", 0, n_sl - 1, n_sl // 2, key="abl_sl")
@@ -351,7 +357,7 @@ with tab_infer:
     if mode == "Dữ liệu mẫu (Mayo)":
         patient_names = [p["info"]["id"] for p in dataset.samples]
         selected_patient_idx = st.sidebar.selectbox("1. Chọn Bệnh nhân (Patient ID)", range(len(patient_names)), format_func=lambda i: patient_names[i])
-        patient_batch = dataset[selected_patient_idx]
+        patient_batch = get_patient_batch(dataset, selected_patient_idx)
         n_slices = patient_batch["info"]["n_slices"]
         selected_slice = st.sidebar.slider("2. Chọn Lát cắt (Slice)", 0, n_slices - 1, int(n_slices/2))
         x_raw = patient_batch["x"][selected_slice].unsqueeze(0).unsqueeze(0)
@@ -613,7 +619,7 @@ with tab_paper:
             patient_names_z = [p["info"]["id"] for p in dataset.samples]
             z_pat = st.selectbox("Bệnh nhân", range(len(patient_names_z)),
                                   format_func=lambda i: patient_names_z[i], key="z_pat")
-            z_batch = dataset[z_pat]
+            z_batch = get_patient_batch(dataset, z_pat)
             n_sl_z = z_batch["info"]["n_slices"]
             z_sl = st.slider("Lát cắt", 0, n_sl_z - 1, n_sl_z // 2, key="z_sl")
 
