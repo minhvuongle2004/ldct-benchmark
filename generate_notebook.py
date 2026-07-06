@@ -67,10 +67,10 @@ code_5 = """# 6. BẮT ĐẦU TRAIN EDR-REDNet VỚI SEED ĐÃ CHỌN 🚀
 !python -m ldctbench.scripts.train --config configs/edrrednet.yaml --dryrun"""
 
 code_6 = """# 7. LƯU FILE TRỌNG SỐ VÀ KẾT QUẢ (.pt, .csv)
-# Lấy file ra ngoài gốc kèm theo tiền tố seed để dễ phân biệt
-!cp /kaggle/working/ldct-benchmark/wandb/*/files/*_best_SSIM.pt /kaggle/working/seed{TRAIN_SEED}_best_SSIM.pt
-!cp /kaggle/working/ldct-benchmark/wandb/*/files/Metrics.csv /kaggle/working/seed{TRAIN_SEED}_Metrics.csv
-!cp /kaggle/working/ldct-benchmark/wandb/*/files/Losses.csv /kaggle/working/seed{TRAIN_SEED}_Losses.csv
+# Dùng latest-run để chỉ lấy kết quả của lần chạy gần nhất, thêm || true để không báo lỗi nếu lỡ dừng sớm
+!cp /kaggle/working/ldct-benchmark/wandb/latest-run/files/*_best_SSIM.pt /kaggle/working/seed{TRAIN_SEED}_best_SSIM.pt 2>/dev/null || true
+!cp /kaggle/working/ldct-benchmark/wandb/latest-run/files/Metrics.csv /kaggle/working/seed{TRAIN_SEED}_Metrics.csv 2>/dev/null || true
+!cp /kaggle/working/ldct-benchmark/wandb/latest-run/files/Losses.csv /kaggle/working/seed{TRAIN_SEED}_Losses.csv 2>/dev/null || true
 !ls -lh /kaggle/working/"""
 
 nb['cells'] = [
