@@ -54,22 +54,21 @@ code_4 = """# 4. Sửa lỗi Config phản chủ
 !sed -i 's/datafolder: data/datafolder: ""/g' /kaggle/working/ldct-benchmark/configs/edrrednet.yaml
 print("Đã Fix lỗi Config!")"""
 
-code_5 = """# 5. BẮT ĐẦU TRAIN EDR-REDNet VỚI NHIỀU SEED 🚀
-%cd /kaggle/working/ldct-benchmark
-# Chạy vòng lặp Train cho 2 seed: 42 và 2024 liên tiếp
-!for SEED in 42 2024; do \\
-    echo "========================================="; \\
-    echo "🚀 BẮT ĐẦU TRAIN VỚI SEED: $SEED"; \\
-    echo "========================================="; \\
-    sed -i "s/seed: .*/seed: $SEED/g" configs/edrrednet.yaml; \\
-    python -m ldctbench.scripts.train --config configs/edrrednet.yaml --dryrun; \\
-    cp wandb/*/files/best_SSIM.pt /kaggle/working/seed${SEED}_best_SSIM.pt; \\
-    rm -rf wandb/*; \\
-done
-"""
+code_4b = """# 5. CHỈ ĐỊNH SEED MUỐN TRAIN (ĐỂ CHẠY SONG SONG NHIỀU KAGGLE)
+# Sửa giá trị này thành 42 hoặc 2024 tùy ý anh nhé!
+TRAIN_SEED = 42
+print(f"✅ Đã chốt Seed: {TRAIN_SEED}")"""
 
-code_6 = """# 6. KIỂM TRA FILE TRỌNG SỐ (.pt)
-# File trọng số của các Seed sẽ được đổi tên và cất an toàn ở thư mục gốc
+code_5 = """# 6. BẮT ĐẦU TRAIN EDR-REDNet VỚI SEED ĐÃ CHỌN 🚀
+%cd /kaggle/working/ldct-benchmark
+# Tự động sửa file yaml theo cái biến TRAIN_SEED ở cell trên
+!sed -i "s/seed: .*/seed: {TRAIN_SEED}/g" configs/edrrednet.yaml
+# Bắt đầu train
+!python -m ldctbench.scripts.train --config configs/edrrednet.yaml --dryrun"""
+
+code_6 = """# 7. LƯU FILE TRỌNG SỐ (.pt)
+# Lấy file ra ngoài gốc kèm theo tiền tố seed để dễ phân biệt
+!cp /kaggle/working/ldct-benchmark/wandb/*/files/*_best_SSIM.pt /kaggle/working/seed{TRAIN_SEED}_best_SSIM.pt
 !ls -lh /kaggle/working/*.pt"""
 
 nb['cells'] = [
@@ -78,6 +77,7 @@ nb['cells'] = [
     nbf.v4.new_code_cell(code_2),
     nbf.v4.new_code_cell(code_3),
     nbf.v4.new_code_cell(code_4),
+    nbf.v4.new_code_cell(code_4b),
     nbf.v4.new_code_cell(code_5),
     nbf.v4.new_code_cell(code_6)
 ]
