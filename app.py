@@ -79,10 +79,16 @@ def load_dataset():
     # Sửa lại đường dẫn data thành thư mục thực tế đang có trên máy
     return TestData("AAPM-Mayo Clinic", "meanstd")
 
-@st.cache_resource(max_entries=2)
-def get_patient_batch(_dataset, pat_idx):
-    """Cache the patient loading to avoid OOM when moving sliders."""
-    return _dataset[pat_idx]
+@st.cache_data(max_entries=10)
+def get_single_slice(_dataset, pat_idx, slice_idx):
+    s = _dataset.samples[pat_idx]
+    in_file = s["in_files"][slice_idx]
+    tg_file = s["tg_files"][slice_idx]
+    x = pydicom.dcmread(in_file).pixel_array.astype("float32")
+    y = pydicom.dcmread(tg_file).pixel_array.astype("float32")
+    x = _dataset._normalize(x)
+    y = _dataset._normalize(y)
+    return torch.from_numpy(x), torch.from_numpy(y)
 
 @st.cache_resource
 def load_networks():
@@ -119,14 +125,26 @@ dataset = load_dataset()
 networks, device = load_networks()
 
 # ==========================================
-# 3. MAIN LAYOUT — TABS
+# 3. GLOBAL CONTROLS
+# ==========================================
+st.sidebar.header("🕹️ Điều khiển Toàn cục")
+mode = st.sidebar.radio("Chế độ dữ liệu", ["Dữ liệu mẫu (Mayo)", "Tải lên file (.dcm)"])
+
+patient_names = [p["info"]["id"] for p in dataset.samples]
+if mode == "Dữ liệu mẫu (Mayo)":
+    global_pat_idx = st.sidebar.selectbox("1. Chọn Bệnh nhân (Patient ID)", range(len(patient_names)), format_func=lambda i: patient_names[i])
+else:
+    global_pat_idx = 0 # Default fallback if upload mode
+
+# Bỏ load full batch để tránh OOM hoàn toàn
+# global_batch = get_patient_batch(dataset, global_pat_idx)
+
+# ==========================================
+# 4. MAIN LAYOUT — TABS
 # ==========================================
 st.title("🔬 EDR-REDNet: Interactive Evaluation")
 tab_infer, tab_ablation, tab_paper = st.tabs(["🖼️ So sánh Mô hình", "🧪 Ablation Study", "📄 Paper Figures"])
 
-# ==========================================
-# TAB 2: ABLATION STUDY
-# ==========================================
 # =========================================================
 # GLOBAL UTILITIES (dùng ở cả 2 tab)
 # =========================================================
@@ -189,21 +207,18 @@ with tab_ablation:
         "D — Full EDR-REDNet (Ours)": {"key": "variant_d", "color": "#2ecc71"},
     }
 
-    col_ctrl1, col_ctrl2 = st.columns([1, 2])
-    with col_ctrl1:
-        patient_names_abl = [p["info"]["id"] for p in dataset.samples]
-        abl_pat = st.selectbox("Chọn bệnh nhân", range(len(patient_names_abl)),
-                               format_func=lambda i: patient_names_abl[i], key="abl_pat")
-    abl_batch = get_patient_batch(dataset, abl_pat)
-    n_sl = abl_batch["info"]["n_slices"]
-    with col_ctrl2:
-        abl_sl = st.slider("Chọn lát cắt", 0, n_sl - 1, n_sl // 2, key="abl_sl")
+    st.markdown("**(Bệnh nhân đang chọn được đồng bộ từ thanh công cụ bên trái)**")
+    
+    n_sl = dataset.samples[global_pat_idx]["n"]
+    
+    abl_sl = st.slider("Chọn lát cắt (Tab 2)", 0, n_sl - 1, n_sl // 2, key="abl_sl")
 
     abl_hu_min = st.sidebar.slider("Ablation Min HU", -1024, 1024, -160, key="abl_hmin")
     abl_hu_max = st.sidebar.slider("Ablation Max HU", -1024, 3000, 245, key="abl_hmax")
 
-    x_abl = abl_batch["x"][abl_sl].unsqueeze(0).unsqueeze(0).to(device)
-    y_abl_np = abl_batch["y"][abl_sl].numpy()
+    x_abl_t, y_abl_t = get_single_slice(dataset, global_pat_idx, abl_sl)
+    x_abl = x_abl_t.unsqueeze(0).unsqueeze(0).to(device)
+    y_abl_np = y_abl_t.numpy()
 
     # ---- ROI Selection UI ----
     st.markdown("### 🎯 Chọn Vùng Quan Tâm (ROI) để tính CNR")
@@ -351,17 +366,12 @@ with tab_ablation:
 # TAB 1: SO SÁNH MÔ HÌNH (inference)
 # ==========================================
 with tab_infer:
-    st.sidebar.header("🕹️ Điều khiển")
-    mode = st.sidebar.radio("Chế độ dữ liệu", ["Dữ liệu mẫu (Mayo)", "Tải lên file (.dcm)"])
-
     if mode == "Dữ liệu mẫu (Mayo)":
-        patient_names = [p["info"]["id"] for p in dataset.samples]
-        selected_patient_idx = st.sidebar.selectbox("1. Chọn Bệnh nhân (Patient ID)", range(len(patient_names)), format_func=lambda i: patient_names[i])
-        patient_batch = get_patient_batch(dataset, selected_patient_idx)
-        n_slices = patient_batch["info"]["n_slices"]
+        n_slices = dataset.samples[global_pat_idx]["n"]
         selected_slice = st.sidebar.slider("2. Chọn Lát cắt (Slice)", 0, n_slices - 1, int(n_slices/2))
-        x_raw = patient_batch["x"][selected_slice].unsqueeze(0).unsqueeze(0)
-        y_raw = patient_batch["y"][selected_slice].numpy()
+        x_raw_t, y_raw_t = get_single_slice(dataset, global_pat_idx, selected_slice)
+        x_raw = x_raw_t.unsqueeze(0).unsqueeze(0).to(device)
+        y_raw = y_raw_t.numpy()
         target_available = True
     else:
         uploaded_file = st.sidebar.file_uploader("1. Chọn file LDCT (Đầu vào)", type=["dcm"])
@@ -614,14 +624,11 @@ with tab_paper:
     if len(dataset.samples) == 0:
         st.info("ℹ️ Không có data Mayo test set trên máy này. Chức năng Zoom cần chạy trên máy có data.")
     else:
+        st.markdown("**(Bệnh nhân đang chọn được đồng bộ từ thanh công cụ bên trái)**")
         col_z1, col_z2 = st.columns([1, 3])
         with col_z1:
-            patient_names_z = [p["info"]["id"] for p in dataset.samples]
-            z_pat = st.selectbox("Bệnh nhân", range(len(patient_names_z)),
-                                  format_func=lambda i: patient_names_z[i], key="z_pat")
-            z_batch = get_patient_batch(dataset, z_pat)
-            n_sl_z = z_batch["info"]["n_slices"]
-            z_sl = st.slider("Lát cắt", 0, n_sl_z - 1, n_sl_z // 2, key="z_sl")
+            n_sl_z = dataset.samples[global_pat_idx]["n"]
+            z_sl = st.slider("Lát cắt (Tab 3)", 0, n_sl_z - 1, n_sl_z // 2, key="z_sl")
 
         with col_z2:
             st.markdown("**Vùng Zoom (trên ảnh 512×512):**")
@@ -636,8 +643,9 @@ with tab_paper:
                 z_humin = st.number_input("HU Min", -1024, 0, -160, step=50, key="zhumin")
                 z_humax = st.number_input("HU Max", 0, 3000, 245, step=50, key="zhumax")
 
-        x_z = z_batch["x"][z_sl].unsqueeze(0).unsqueeze(0).to(device)
-        y_z_np = z_batch["y"][z_sl].numpy()
+        x_z_t, y_z_t = get_single_slice(dataset, global_pat_idx, z_sl)
+        x_z = x_z_t.unsqueeze(0).unsqueeze(0).to(device)
+        y_z_np = y_z_t.numpy()
 
         with st.spinner("Đang chạy inference cho Zoom..."):
             zoom_imgs = {}
