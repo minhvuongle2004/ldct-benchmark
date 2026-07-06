@@ -8,7 +8,7 @@ Notebook này đã được Fix toàn bộ các lỗi liên quan đến Kaggle (
 
 **Lưu ý trước khi chạy:**
 1. Đảm bảo anh đã đẩy code mới nhất lên Github.
-2. Bật GPU P100 ở cột bên phải (Session options -> Accelerator).
+2. Bật **GPU T4x2** ở cột bên phải (Session options -> Accelerator). TRÁNH DÙNG P100 vì PyTorch bản mới đã ngừng hỗ trợ con chip cũ này.
 3. Đã Add thư mục Data `AAPM-Mayo Clinic` vào Kaggle."""
 
 code_1 = """# 1. Cài đặt các thư viện phụ trợ
