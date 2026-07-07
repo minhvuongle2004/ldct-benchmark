@@ -196,8 +196,8 @@ with open("configs/edrrednet.yaml", "r", encoding="utf-8") as f:
 # Cập nhật các thông số động cho Kaggle
 config["seed"] = TRAIN_SEED
 config["datafolder"] = data_path
-config["num_workers"] = 4
-config["devices"] = [0, 1]  # Tận dụng 2 card T4x2
+config["num_workers"] = 2  # Trả về 2 để tránh bị lỗi tràn RAM/treo Dataloader
+config["devices"] = [0]    # Chỉ dùng 1 Card T4 để tránh lỗi DataParallel bị treo sau vài Epoch
 
 checkpoints = glob.glob(f"/kaggle/input/**/seed{TRAIN_SEED}_best_*.pt", recursive=True)
 if checkpoints:
