@@ -42,7 +42,7 @@ def main():
     with torch.no_grad():
         for i, patient in enumerate(data):
             patient_name = patient["info"]["id"]
-            exam_type = patient["f_hd"][0][0].split("/")[1][0]
+            exam_type = patient_name[0]  # C121 -> C (Chest), L506 -> L (Abdomen), N180 -> N (Neuro)
             
             for slice_idx in tqdm(range(patient["info"]["n_slices"]), desc=f"Bệnh nhân {patient_name}"):
                 x = torch.unsqueeze(torch.unsqueeze(patient["x"][slice_idx], 0), 0).to(dev)
