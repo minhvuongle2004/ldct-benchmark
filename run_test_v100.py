@@ -15,9 +15,10 @@ def main():
     data = TestData("data/AAPM-Mayo Clinic", "meanstd")
     
     # 2. Load model
-    print("Đang tải mô hình best_SSIM.pt (Seed 42)...")
+    print("Đang tải mô hình...")
     net = Model(args=None).to(dev)
-    ckpt_path = "wandb/latest-run/files/best_SSIM.pt"
+    # Lấy từ tham số dòng lệnh hoặc run mới nhất
+    ckpt_path = sys.argv[1] if len(sys.argv) > 1 else "wandb/latest-run/files/best_SSIM.pt"
     if not os.path.exists(ckpt_path):
         print(f"❌ Không tìm thấy file {ckpt_path}!")
         sys.exit(1)
