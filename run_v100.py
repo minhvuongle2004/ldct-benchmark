@@ -9,7 +9,7 @@ with open(config_path, "r", encoding="utf-8") as f:
 config["datafolder"] = "data/AAPM-Mayo Clinic"
 config["num_workers"] = 8
 config["devices"] = [0]
-config["seed"] = 42 # Sửa seed tại đây nếu muốn
+config["seed"] = 2024 # Seed lần 3
 
 with open(config_path, "w", encoding="utf-8") as f:
     yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
