@@ -76,4 +76,4 @@ if sample_dcm and not sample_dcm.startswith("0"):
 
 # 4. Chạy Train
 print("\n🚀 Bắt đầu Train...")
-subprocess.run(["python", "-m", "ldctbench.scripts.train", "--config", config_path])
+subprocess.run([sys.executable, "-m", "ldctbench.scripts.train", "--config", config_path])
