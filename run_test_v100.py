@@ -22,7 +22,8 @@ def main():
         print(f"❌ Không tìm thấy file {ckpt_path}!")
         sys.exit(1)
         
-    state_dict = torch.load(ckpt_path, map_location=dev)
+    checkpoint = torch.load(ckpt_path, map_location=dev)
+    state_dict = checkpoint.get("model_state_dict", checkpoint)
     
     # Handle DataParallel prefix if present
     new_state_dict = {}
