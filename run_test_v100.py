@@ -17,7 +17,7 @@ def main():
     # 2. Load model
     print("Đang tải mô hình best_SSIM.pt (Seed 42)...")
     net = Model(args=None).to(dev)
-    ckpt_path = "wandb/offline-run-20260708_083042-14q2ac5o/files/best_SSIM.pt"
+    ckpt_path = "wandb/latest-run/files/best_SSIM.pt"
     if not os.path.exists(ckpt_path):
         print(f"❌ Không tìm thấy file {ckpt_path}!")
         sys.exit(1)
