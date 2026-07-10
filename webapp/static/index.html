@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EDR-REDNet — Interactive Evaluation</title>
+  <meta name="description" content="Interactive visualization tool for EDR-REDNet LDCT denoising model evaluation." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <!-- ── SIDEBAR ──────────────────────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">🔬</div>
+      <div>
+        <div class="brand-title">EDR-REDNet</div>
+        <div class="brand-sub">Interactive Evaluation</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-label">Chế độ dữ liệu</div>
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="modeMayo" onclick="setMode('mayo')">📂 Mayo Dataset</button>
+        <button class="mode-btn" id="modeUpload" onclick="setMode('upload')">⬆️ Upload DCM</button>
+      </div>
+    </div>
+
+    <!-- Mayo Controls -->
+    <div id="mayoControls" class="sidebar-section">
+      <div class="section-label">Bệnh nhân</div>
+      <div class="select-wrapper">
+        <select id="patientSelect" onchange="onPatientChange()">
+          <option>Đang tải...</option>
+        </select>
+      </div>
+      <div class="section-label mt-3">Lát cắt (Slice)</div>
+      <div class="slider-row">
+        <input type="range" id="sliceSlider" min="0" max="100" value="0" oninput="onSliceChange(this.value)" />
+        <span class="slider-val" id="sliceVal">0</span>
+      </div>
+    </div>
+
+    <!-- Upload Controls -->
+    <div id="uploadControls" class="sidebar-section hidden">
+      <div class="section-label">File LDCT (Đầu vào)</div>
+      <label class="upload-label" for="ldctFile">
+        <span class="upload-icon-sm">📁</span>
+        <span id="ldctFileName">Chọn file .dcm</span>
+        <input type="file" id="ldctFile" accept=".dcm" onchange="onFileSelect('ldct', this)" hidden />
+      </label>
+      <div class="section-label mt-3">File NDCT (Tùy chọn)</div>
+      <label class="upload-label" for="ndctFile">
+        <span class="upload-icon-sm">📁</span>
+        <span id="ndctFileName">Chọn file .dcm</span>
+        <input type="file" id="ndctFile" accept=".dcm" onchange="onFileSelect('ndct', this)" hidden />
+      </label>
+      <button class="primary-btn mt-3 w-full" id="uploadBtn" onclick="runUpload()" disabled>
+        <span>▶ Chạy Inference</span>
+      </button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-label">HU Windowing</div>
+      <div class="slider-label-row"><span>Min HU</span><span id="huMinVal">-160</span></div>
+      <input type="range" id="huMinSlider" min="-1024" max="1024" value="-160" oninput="onHUChange()" />
+      <div class="slider-label-row mt-2"><span>Max HU</span><span id="huMaxVal">245</span></div>
+      <input type="range" id="huMaxSlider" min="-1024" max="3000" value="245" oninput="onHUChange()" />
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-label">Hiển thị thêm</div>
+      <label class="toggle-row">
+        <input type="checkbox" id="showDiff" onchange="onOptionsChange()" />
+        <span class="toggle-label">🔍 Error Map</span>
+      </label>
+      <label class="toggle-row mt-2">
+        <input type="checkbox" id="showEdge" onchange="onOptionsChange()" />
+        <span class="toggle-label">📐 Sobel Edge Map</span>
+      </label>
+    </div>
+
+    <div class="sidebar-section sidebar-info" id="deviceInfo">
+      <div class="info-badge" id="deviceBadge">⚙️ Đang kết nối...</div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN CONTENT ──────────────────────────────────────────────────────── -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+      <div class="topbar-title">EDR-REDNet: Interactive LDCT Evaluation</div>
+      <div class="tab-nav">
+        <button class="tab-btn active" id="tab-infer-btn" onclick="switchTab('infer')">🖼️ So sánh Mô hình</button>
+        <button class="tab-btn" id="tab-ablation-btn" onclick="switchTab('ablation')">🧪 Ablation Study</button>
+        <button class="tab-btn" id="tab-paper-btn" onclick="switchTab('paper')">📄 Paper Figures</button>
+      </div>
+    </header>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay hidden" id="loadingOverlay">
+      <div class="loading-card">
+        <div class="spinner-large"></div>
+        <div class="loading-text" id="loadingText">Đang chạy Inference...</div>
+      </div>
+    </div>
+
+    <!-- ── TAB 1: So sánh Mô hình ────────────────────────────────────────── -->
+    <div class="tab-content active" id="tab-infer">
+      <div class="page-header">
+        <h1 class="page-title">So sánh Mô hình</h1>
+        <p class="page-desc">So sánh kết quả khử nhiễu giữa RED-CNN (Baseline) và EDR-REDNet (Mô hình đề xuất)</p>
+      </div>
+
+      <!-- Metrics Bar -->
+      <div class="metrics-bar" id="metricsBar">
+        <div class="metric-card" id="mc-ssim-edr">
+          <div class="metric-label">SSIM (EDR)</div>
+          <div class="metric-value">—</div>
+          <div class="metric-delta"></div>
+        </div>
+        <div class="metric-card" id="mc-psnr-edr">
+          <div class="metric-label">PSNR (EDR)</div>
+          <div class="metric-value">—</div>
+          <div class="metric-delta"></div>
+        </div>
+        <div class="metric-card" id="mc-edge-edr">
+          <div class="metric-label">Edge SSIM (EDR)</div>
+          <div class="metric-value">—</div>
+          <div class="metric-delta"></div>
+        </div>
+        <div class="metric-card" id="mc-vif-edr">
+          <div class="metric-label">VIF (EDR)</div>
+          <div class="metric-value">—</div>
+          <div class="metric-delta"></div>
+        </div>
+      </div>
+
+      <!-- Image Grid -->
+      <div class="image-grid" id="imageGrid">
+        <div class="img-card" id="card-ldct">
+          <div class="img-card-header">LDCT (Input)</div>
+          <div class="img-wrapper"><img class="ct-img" id="img-ldct" src="" alt="" /></div>
+        </div>
+        <div class="img-card" id="card-redcnn">
+          <div class="img-card-header">RED-CNN <span class="badge-baseline">Baseline</span></div>
+          <div class="img-wrapper"><img class="ct-img" id="img-redcnn" src="" alt="" /></div>
+        </div>
+        <div class="img-card featured" id="card-edr">
+          <div class="img-card-header">EDR-REDNet <span class="badge-ours">Ours</span></div>
+          <div class="img-wrapper"><img class="ct-img" id="img-edr" src="" alt="" /></div>
+        </div>
+        <div class="img-card" id="card-ndct">
+          <div class="img-card-header">NDCT (Ground Truth)</div>
+          <div class="img-wrapper"><img class="ct-img" id="img-ndct" src="" alt="" /></div>
+        </div>
+      </div>
+
+      <!-- Metrics Table -->
+      <div class="table-section" id="metricsTableSection">
+        <h3 class="section-title">📊 Bảng So sánh Chỉ số</h3>
+        <table class="metrics-table" id="metricsTable">
+          <thead><tr><th>Chỉ số</th><th>RED-CNN</th><th>EDR-REDNet</th><th>Δ (EDR − RED)</th></tr></thead>
+          <tbody id="metricsTableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Diff Section -->
+      <div id="diffSection" class="extra-section hidden">
+        <h3 class="section-title">🔍 Error Map (So với NDCT)</h3>
+        <div class="image-grid-3" id="diffGrid">
+          <div class="img-card"><div class="img-card-header">LDCT Error</div><div class="img-wrapper"><img class="ct-img" id="diff-ldct" /></div></div>
+          <div class="img-card"><div class="img-card-header">RED-CNN Error</div><div class="img-wrapper"><img class="ct-img" id="diff-redcnn" /></div></div>
+          <div class="img-card featured"><div class="img-card-header">EDR Error</div><div class="img-wrapper"><img class="ct-img" id="diff-edr" /></div></div>
+        </div>
+      </div>
+
+      <!-- Edge Section -->
+      <div id="edgeSection" class="extra-section hidden">
+        <h3 class="section-title">📐 Sobel Edge Map</h3>
+        <div class="image-grid" id="edgeGrid">
+          <div class="img-card"><div class="img-card-header">LDCT Edges</div><div class="img-wrapper"><img class="ct-img" id="edge-ldct" /></div></div>
+          <div class="img-card"><div class="img-card-header">RED-CNN Edges</div><div class="img-wrapper"><img class="ct-img" id="edge-redcnn" /></div></div>
+          <div class="img-card featured"><div class="img-card-header">EDR Edges</div><div class="img-wrapper"><img class="ct-img" id="edge-edr" /></div></div>
+          <div class="img-card"><div class="img-card-header">NDCT Edges</div><div class="img-wrapper"><img class="ct-img" id="edge-ndct" /></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB 2: Ablation Study ─────────────────────────────────────────── -->
+    <div class="tab-content" id="tab-ablation">
+      <div class="page-header">
+        <h1 class="page-title">Ablation Study</h1>
+        <p class="page-desc">Phân tích đóng góp từng thành phần trong kiến trúc EDR-REDNet</p>
+      </div>
+
+      <!-- ROI Controls -->
+      <div class="glass-panel roi-panel">
+        <h3 class="section-title">🎯 Vùng Quan Tâm (ROI) — Dùng để tính CNR</h3>
+        <div class="roi-layout">
+          <div class="roi-img-col">
+            <div class="img-wrapper-sq"><img id="roi-preview" src="" class="ct-img" /></div>
+            <div class="roi-legend">
+              <span class="roi-dot red"></span> Mục tiêu (Signal)
+              <span class="roi-dot cyan ml-2"></span> Nền (Noise)
+            </div>
+          </div>
+          <div class="roi-sliders-col">
+            <div class="roi-group">
+              <div class="roi-group-title" style="color:#f87171">🔴 Vùng Mục tiêu</div>
+              <div class="slider-label-row"><span>X</span><span id="txVal">200</span></div>
+              <input type="range" id="txSlider" min="0" max="480" value="200" oninput="onROIChange()" />
+              <div class="slider-label-row mt-1"><span>Y</span><span id="tyVal">250</span></div>
+              <input type="range" id="tySlider" min="0" max="480" value="250" oninput="onROIChange()" />
+              <div class="slider-label-row mt-1"><span>Size</span><span id="tsVal">20</span></div>
+              <input type="range" id="tsSlider" min="5" max="100" value="20" oninput="onROIChange()" />
+            </div>
+            <div class="roi-group mt-3">
+              <div class="roi-group-title" style="color:#67e8f9">🔵 Vùng Nền</div>
+              <div class="slider-label-row"><span>X</span><span id="bxVal">100</span></div>
+              <input type="range" id="bxSlider" min="0" max="480" value="100" oninput="onROIChange()" />
+              <div class="slider-label-row mt-1"><span>Y</span><span id="byVal">250</span></div>
+              <input type="range" id="bySlider" min="0" max="480" value="250" oninput="onROIChange()" />
+              <div class="slider-label-row mt-1"><span>Size</span><span id="bsVal">30</span></div>
+              <input type="range" id="bsSlider" min="5" max="100" value="30" oninput="onROIChange()" />
+            </div>
+            <button class="primary-btn mt-3" onclick="runAblation()">▶ Cập nhật Ablation</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Variant Images -->
+      <div class="ablation-grid" id="ablationGrid">
+        <!-- Populated by JS -->
+      </div>
+
+      <!-- Ablation Metrics Table -->
+      <div class="table-section" id="ablationTableSection">
+        <h3 class="section-title">📊 Bảng Metrics theo Variant</h3>
+        <table class="metrics-table" id="ablationTable">
+          <thead><tr><th>Biến thể</th><th>SSIM</th><th>PSNR</th><th>VIF</th><th>Edge SSIM</th><th>CNR</th><th>HU Dev</th></tr></thead>
+          <tbody id="ablationTableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Bar Charts -->
+      <div class="chart-grid" id="chartGrid">
+        <div class="chart-card glass-panel"><canvas id="chart-SSIM"></canvas></div>
+        <div class="chart-card glass-panel"><canvas id="chart-PSNR"></canvas></div>
+        <div class="chart-card glass-panel"><canvas id="chart-Edge_SSIM"></canvas></div>
+        <div class="chart-card glass-panel"><canvas id="chart-VIF"></canvas></div>
+        <div class="chart-card glass-panel"><canvas id="chart-CNR"></canvas></div>
+        <div class="chart-card glass-panel"><canvas id="chart-HU_Dev"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── TAB 3: Paper Figures ──────────────────────────────────────────── -->
+    <div class="tab-content" id="tab-paper">
+      <div class="page-header">
+        <h1 class="page-title">Paper Figures</h1>
+        <p class="page-desc">Trực quan hóa và xuất hình ảnh chất lượng cao phục vụ bài báo khoa học</p>
+      </div>
+
+      <!-- Boxplots Section -->
+      <div class="glass-panel mb-4">
+        <h3 class="section-title">📦 Phần 1: Boxplots — Phân bố Chỉ số trên tập Test</h3>
+        <div id="boxplotStatus" class="status-banner info">Đang tải dữ liệu boxplot...</div>
+        <div class="boxplot-grid" id="boxplotGrid">
+          <div class="chart-card glass-panel"><canvas id="bp-PSNR"></canvas></div>
+          <div class="chart-card glass-panel"><canvas id="bp-SSIM"></canvas></div>
+          <div class="chart-card glass-panel"><canvas id="bp-Edge_SSIM"></canvas></div>
+        </div>
+        <div id="pvalTable" class="pval-section hidden"></div>
+      </div>
+
+      <!-- Zoom Section -->
+      <div class="glass-panel mb-4">
+        <h3 class="section-title">🔎 Phần 2: Zoom Vùng Quan Tâm</h3>
+        <div class="zoom-controls glass-panel-inner">
+          <div class="zoom-control-grid">
+            <div>
+              <div class="slider-label-row"><span>X (góc trái)</span><span id="zxVal">180</span></div>
+              <input type="range" id="zxSlider" min="0" max="480" value="180" oninput="updateZoom()" />
+            </div>
+            <div>
+              <div class="slider-label-row"><span>Y (góc trên)</span><span id="zyVal">220</span></div>
+              <input type="range" id="zySlider" min="0" max="480" value="220" oninput="updateZoom()" />
+            </div>
+            <div>
+              <div class="slider-label-row"><span>Rộng</span><span id="zwVal">120</span></div>
+              <input type="range" id="zwSlider" min="20" max="300" value="120" oninput="updateZoom()" />
+            </div>
+            <div>
+              <div class="slider-label-row"><span>Cao</span><span id="zhVal">120</span></div>
+              <input type="range" id="zhSlider" min="20" max="300" value="120" oninput="updateZoom()" />
+            </div>
+          </div>
+          <button class="primary-btn mt-3" onclick="runZoom()">▶ Cập nhật Zoom</button>
+        </div>
+
+        <h4 class="subsection-title">🖼️ Ảnh Toàn cục (vùng zoom đánh dấu)</h4>
+        <div class="zoom-full-grid" id="zoomFullGrid"></div>
+
+        <h4 class="subsection-title mt-4">🔬 Vùng Zoom</h4>
+        <div class="zoom-crop-grid" id="zoomCropGrid"></div>
+
+        <h4 class="subsection-title mt-4">🌡️ Difference Map</h4>
+        <div class="zoom-crop-grid" id="zoomDiffGrid"></div>
+
+        <h4 class="subsection-title mt-4">📐 Sobel Edge Map</h4>
+        <div class="zoom-crop-grid" id="zoomSobelGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
