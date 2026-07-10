@@ -51,8 +51,8 @@ ldctbench.evaluate.utils.torch.load = _safe_load
 ldctbench.evaluate.utils.load_yaml = _safe_load_yaml
 ldctbench.utils.load_yaml = _safe_load_yaml
 
+import argparse
 from ldctbench.data import TestData
-from ldctbench.evaluate import setup_trained_model
 from ldctbench.hub import load_model as hub_load_model
 
 # ── Device ───────────────────────────────────────────────────────────────────
@@ -63,21 +63,22 @@ print(f"[INFO] Using device: {DEVICE}")
 _dataset: Optional[TestData] = None
 _networks: Optional[dict] = None
 
-def _setup_wandb_dir(run_name: str, ckpt_path: str, cfg_path: str, overrides: dict = None):
-    d = os.path.join(ROOT, "wandb", run_name, "files")
-    os.makedirs(d, exist_ok=True)
-    if os.path.exists(ckpt_path) and os.path.exists(cfg_path):
-        if overrides:
-            with open(cfg_path, "r", encoding="utf-8") as f:
-                cfg = yaml.load(f, Loader=yaml.FullLoader)
-            cfg.update(overrides)
-            with open(os.path.join(d, "args.yaml"), "w", encoding="utf-8") as f:
-                yaml.dump(cfg, f)
-        else:
-            shutil.copy(cfg_path, os.path.join(d, "args.yaml"))
-        shutil.copy(ckpt_path, os.path.join(d, "best_SSIM.pt"))
-        return True
-    return False
+def _load_edr_model(ckpt_path: str, use_sobel: bool = True) -> torch.nn.Module:
+    """Load EDR-REDNet directly from .pt file without wandb setup."""
+    from ldctbench.methods.edrrednet.network import Model
+    if not os.path.exists(ckpt_path):
+        return None
+    checkpoint = torch.load(ckpt_path, map_location=DEVICE)
+    state_dict = checkpoint.get("model_state_dict", checkpoint)
+    # Strip module. prefix
+    new_sd = {}
+    for k, v in state_dict.items():
+        new_sd[k[7:] if k.startswith("module.") else k] = v
+    mock_args = argparse.Namespace(use_sobel_input=use_sobel, num_edge_blocks=2)
+    net = Model(args=mock_args).to(DEVICE)
+    net.load_state_dict(new_sd)
+    net.eval()
+    return net
 
 
 def _get_dataset() -> TestData:
@@ -91,31 +92,40 @@ def _get_dataset() -> TestData:
 def _get_networks() -> dict:
     global _networks
     if _networks is None:
-        cfg = os.path.join(ROOT, "configs", "edrrednet.yaml")
-        ckpt = os.path.join(ROOT, "best_SSIM.pt")
-        _setup_wandb_dir("edr_redcnn_latest", ckpt, cfg)
-        _setup_wandb_dir("edr_variant_b",
-            os.path.join(ROOT, "results", "training", "EDR-RedCnn", "VariantB", "Seed1339", "variantB_seed1339_best_SSIM.pt"),
-            cfg, overrides={"use_sobel_input": False})
-        _setup_wandb_dir("edr_variant_c",
-            os.path.join(ROOT, "results", "training", "EDR-RedCnn", "VariantC", "Seed1339", "variantC_seed1339_best_SSIM.pt"),
-            cfg, overrides={"use_sobel_input": True})
-
         nets = {}
+        # RED-CNN pretrained baseline
         nets["redcnn"] = hub_load_model("redcnn", eval=True).to(DEVICE)
         nets["variant_a"] = nets["redcnn"]
 
-        net_d = setup_trained_model(run_name="edr_redcnn_latest", device=DEVICE,
-            network_name="Model", state_dict="best_SSIM", eval=True)
+        # EDR-REDNet Variant D — use Seed42 by default
+        ckpt_candidates = [
+            os.path.join(ROOT, "results", "training", "EDR-REDCNN", "Seed42",   "best_SSIM_seed42.pt"),
+            os.path.join(ROOT, "results", "training", "EDR-REDCNN", "Seed1339", "best_SSIM_seed1339.pt"),
+            os.path.join(ROOT, "results", "training", "EDR-REDCNN", "Seed2024", "best_SSIM_seed2024.pt"),
+            os.path.join(ROOT, "wandb", "edr_redcnn_seed42",  "files", "best_SSIM.pt"),
+            os.path.join(ROOT, "wandb", "edr_redcnn_latest",  "files", "best_SSIM.pt"),
+            os.path.join(ROOT, "wandb", "edr_redcnn",         "files", "best_SSIM.pt"),
+        ]
+        ckpt_d = next((p for p in ckpt_candidates if os.path.exists(p)), None)
+        net_d = _load_edr_model(ckpt_d, use_sobel=True) if ckpt_d else None
+        if net_d is None:
+            print("[WARNING] EDR-REDNet model not found! Check results/training/EDR-REDCNN/")
         nets["edr_redcnn"] = net_d
         nets["variant_d"] = net_d
 
-        for name, run_name in [("variant_b", "edr_variant_b"), ("variant_c", "edr_variant_c")]:
-            try:
-                nets[name] = setup_trained_model(run_name=run_name, device=DEVICE,
-                    network_name="Model", state_dict="best_SSIM", eval=True)
-            except Exception:
-                nets[name] = None
+        # Variant B (+EdgeBlock, no Sobel)
+        ckpt_b = next((p for p in [
+            os.path.join(ROOT, "results", "training", "EDR-RedCnn", "VariantB", "Seed1339", "variantB_seed1339_best_SSIM.pt"),
+            os.path.join(ROOT, "wandb", "edr_variant_b", "files", "best_SSIM.pt"),
+        ] if os.path.exists(p)), None)
+        nets["variant_b"] = _load_edr_model(ckpt_b, use_sobel=False) if ckpt_b else None
+
+        # Variant C (+Sobel, no EdgeBlock)
+        ckpt_c = next((p for p in [
+            os.path.join(ROOT, "results", "training", "EDR-RedCnn", "VariantC", "Seed1339", "variantC_seed1339_best_SSIM.pt"),
+            os.path.join(ROOT, "wandb", "edr_variant_c", "files", "best_SSIM.pt"),
+        ] if os.path.exists(p)), None)
+        nets["variant_c"] = _load_edr_model(ckpt_c, use_sobel=True) if ckpt_c else None
 
         _networks = nets
     return _networks

@@ -12,8 +12,8 @@ sys.path.insert(0, ROOT)
 
 if __name__ == "__main__":
     print("=" * 55)
-    print("  EDR-REDNet Visualizer — Web App")
-    print("  Mở trình duyệt tại: http://localhost:8000")
+    print("  EDR-REDNet Visualizer")
+    print("  Open browser at: http://localhost:8000")
     print("=" * 55)
     subprocess.run([
         sys.executable, "-m", "uvicorn",
