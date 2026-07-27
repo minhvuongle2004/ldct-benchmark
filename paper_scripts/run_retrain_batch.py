@@ -46,7 +46,19 @@ def run_command(cmd, log_file=None):
     if log_file:
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
         with open(log_file, "w", encoding="utf-8") as f:
-            proc = subprocess.Popen(cmd, shell=True, stdout=f, stderr=subprocess.STDOUT)
+            proc = subprocess.Popen(
+                cmd,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+            for line in proc.stdout:
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                f.write(line)
+                f.flush()
             proc.wait()
     else:
         proc = subprocess.Popen(cmd, shell=True)
