@@ -93,14 +93,12 @@ def train(args):
     # Vòng lặp vô hạn để retry nếu kết nối mạng bị gián đoạn
     while True:
         try:
-            # Kiểm tra xem có tag (nhãn) cho experiment không
+            # Set default mode to offline if not online in env to avoid interactive prompt
+            w_mode = os.environ.get("WANDB_MODE", "offline")
             if hasattr(args, "wandbtag") and args.wandbtag:
-                # Khởi tạo wandb với project name và tags
-                # Tags giúp phân loại các experiment (ví dụ: "baseline", "v2", "final")
-                wandb.init(project="ldct-benchmark", config=args, tags=[args.wandbtag])
+                wandb.init(project="ldct-benchmark", config=args, tags=[args.wandbtag], mode=w_mode)
             else:
-                # Khởi tạo wandb không có tags
-                wandb.init(project="ldct-benchmark", config=args)
+                wandb.init(project="ldct-benchmark", config=args, mode=w_mode)
             
             # Nếu khởi tạo thành công, thoát vòng lặp
             break
