@@ -43,9 +43,11 @@ def run_command(cmd, log_file=None):
     print(f"\n🚀 Executing: {cmd}")
     start_time = time.time()
     
-    # Set PYTHONUNBUFFERED=1 to prevent Python stream buffering
+    # Set environment variables to force non-interactive offline logging
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    env["WANDB_MODE"] = "offline"
+    env["WANDB_SILENT"] = "true"
     
     # Allow process to output directly to terminal standard output
     proc = subprocess.Popen(cmd, shell=True, env=env)
