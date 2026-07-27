@@ -43,26 +43,13 @@ def run_command(cmd, log_file=None):
     print(f"\n🚀 Executing: {cmd}")
     start_time = time.time()
     
-    if log_file:
-        os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        with open(log_file, "w", encoding="utf-8") as f:
-            proc = subprocess.Popen(
-                cmd,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-            )
-            for line in proc.stdout:
-                sys.stdout.write(line)
-                sys.stdout.flush()
-                f.write(line)
-                f.flush()
-            proc.wait()
-    else:
-        proc = subprocess.Popen(cmd, shell=True)
-        proc.wait()
+    # Set PYTHONUNBUFFERED=1 to prevent Python stream buffering
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    
+    # Allow process to output directly to terminal standard output
+    proc = subprocess.Popen(cmd, shell=True, env=env)
+    proc.wait()
         
     elapsed = time.time() - start_time
     if proc.returncode == 0:
