@@ -7,6 +7,8 @@ const state = {
   mode: 'mayo',
   patIdx: 0,
   sliceIdx: 0,
+  uploadSessionId: null,
+  uploadSliceIdx: 0,
   huMin: -160,
   huMax: 245,
   showDiff: false,
@@ -69,7 +71,9 @@ async function fetchPatients() {
       slider.max = maxSlice;
       slider.value = Math.floor(maxSlice / 2);
       state.sliceIdx = parseInt(slider.value);
-      document.getElementById('sliceVal').textContent = state.sliceIdx;
+      const sliceInput = document.getElementById('sliceVal');
+      sliceInput.max = maxSlice;
+      sliceInput.value = state.sliceIdx;
       runInfer();
       runAblation();
       runZoom();
@@ -91,15 +95,29 @@ function onPatientChange() {
     slider.max = maxSlice;
     slider.value = Math.floor(maxSlice / 2);
     state.sliceIdx = parseInt(slider.value);
-    document.getElementById('sliceVal').textContent = state.sliceIdx;
+    const sliceInput = document.getElementById('sliceVal');
+    sliceInput.max = maxSlice;
+    sliceInput.value = state.sliceIdx;
   }
-  debouncedInfer();
+  debouncedUpdate();
 }
 
 function onSliceChange(val) {
   state.sliceIdx = parseInt(val);
-  document.getElementById('sliceVal').textContent = val;
-  debouncedInfer();
+  document.getElementById('sliceVal').value = val;
+  debouncedUpdate();
+}
+
+function onSliceInput(val) {
+  let parsed = parseInt(val);
+  const max = parseInt(document.getElementById('sliceSlider').max);
+  if (isNaN(parsed) || parsed < 0) parsed = 0;
+  if (parsed > max) parsed = max;
+  
+  document.getElementById('sliceSlider').value = parsed;
+  document.getElementById('sliceVal').value = parsed;
+  state.sliceIdx = parsed;
+  debouncedUpdate();
 }
 
 function onHUChange() {
@@ -107,19 +125,26 @@ function onHUChange() {
   state.huMax = parseInt(document.getElementById('huMaxSlider').value);
   document.getElementById('huMinVal').textContent = state.huMin;
   document.getElementById('huMaxVal').textContent = state.huMax;
-  debouncedInfer();
+  debouncedUpdate();
 }
 
 function onOptionsChange() {
   state.showDiff = document.getElementById('showDiff').checked;
   state.showEdge = document.getElementById('showEdge').checked;
-  debouncedInfer();
+  debouncedUpdate();
 }
 
 // ── Debounce ───────────────────────────────────────────────────────────────
-function debouncedInfer(ms = 400) {
+function debouncedUpdate(ms = 400) {
   clearTimeout(state.inferTimer);
-  state.inferTimer = setTimeout(runInfer, ms);
+  state.inferTimer = setTimeout(() => {
+    if (document.getElementById('tab-infer').classList.contains('active')) {
+      if (state.mode === 'mayo') runInfer();
+      else if (state.mode === 'upload' && state.uploadSessionId) runUploadSlice();
+    }
+    if (document.getElementById('tab-ablation').classList.contains('active') && state.mode === 'mayo') runAblation();
+    if (document.getElementById('tab-paper').classList.contains('active') && state.mode === 'mayo') runZoom();
+  }, ms);
 }
 
 // ── Tab Switching ──────────────────────────────────────────────────────────
@@ -128,6 +153,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById(`tab-${name}`).classList.add('active');
   document.getElementById(`tab-${name}-btn`).classList.add('active');
+  debouncedUpdate(50); // Refresh data for the newly opened tab
 }
 
 // ── Sidebar Toggle ─────────────────────────────────────────────────────────
@@ -249,32 +275,113 @@ function renderEdge(edge) {
 }
 
 // ── Upload (Tab 1) ─────────────────────────────────────────────────────────
-function onFileSelect(type, input) {
-  const name = input.files[0]?.name || 'Chọn file .dcm';
-  document.getElementById(`${type}FileName`).textContent = name;
-  const ldct = document.getElementById('ldctFile');
-  document.getElementById('uploadBtn').disabled = !ldct.files.length;
+function onFolderSelect(input) {
+  const files = input.files;
+  if (!files || !files.length) return;
+  
+  // Count how many .dcm files are in the selected folder
+  let dcmCount = 0;
+  for (let i = 0; i < files.length; i++) {
+    if (files[i].name.toLowerCase().endsWith('.dcm')) dcmCount++;
+  }
+  
+  document.getElementById('ldctFolderName').textContent = `Đã chọn ${dcmCount} file .dcm`;
+  
+  if (dcmCount > 0) {
+    runFolderUpload(files);
+  } else {
+    alert("Không tìm thấy file .dcm nào trong thư mục đã chọn!");
+  }
 }
 
-async function runUpload() {
-  const ldct = document.getElementById('ldctFile');
-  const ndct = document.getElementById('ndctFile');
-  if (!ldct.files.length) return;
-
-  showLoading('Đang xử lý file DICOM...');
+async function runFolderUpload(files) {
+  showLoading('Đang tải lên và xử lý thư mục...');
   try {
     const fd = new FormData();
-    fd.append('ldct_file', ldct.files[0]);
-    if (ndct.files.length) fd.append('ndct_file', ndct.files[0]);
-    fd.append('hu_min', state.huMin);
-    fd.append('hu_max', state.huMax);
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].name.toLowerCase().endsWith('.dcm')) {
+        fd.append('files', files[i]);
+      }
+    }
 
-    const r = await fetch('/api/upload', {method: 'POST', body: fd});
+    const r = await fetch('/api/upload_folder', {method: 'POST', body: fd});
     const data = await r.json();
-    renderInferImages(data);
-    if (data.metrics && Object.keys(data.metrics).length) renderMetrics(data.metrics);
+    
+    if (r.ok) {
+      state.uploadSessionId = data.session_id;
+      const maxSlice = data.total_slices - 1;
+      
+      // Init slider
+      const slider = document.getElementById('uploadSliceSlider');
+      const valInput = document.getElementById('uploadSliceVal');
+      slider.max = maxSlice;
+      slider.value = Math.floor(maxSlice / 2);
+      valInput.max = maxSlice;
+      valInput.value = slider.value;
+      state.uploadSliceIdx = parseInt(slider.value);
+      
+      document.getElementById('uploadSliderContainer').classList.remove('hidden');
+      
+      // Fetch the first slice to show
+      runUploadSlice();
+    } else {
+      alert("Lỗi tải lên: " + data.detail);
+    }
   } catch (e) {
     console.error('Upload failed:', e);
+    alert("Lỗi tải lên: " + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+function onUploadSliceChange(val) {
+  state.uploadSliceIdx = parseInt(val);
+  document.getElementById('uploadSliceVal').value = val;
+  debouncedUpdate();
+}
+
+function onUploadSliceInput(val) {
+  let parsed = parseInt(val);
+  const max = parseInt(document.getElementById('uploadSliceSlider').max);
+  if (isNaN(parsed) || parsed < 0) parsed = 0;
+  if (parsed > max) parsed = max;
+  
+  document.getElementById('uploadSliceSlider').value = parsed;
+  document.getElementById('uploadSliceVal').value = parsed;
+  state.uploadSliceIdx = parsed;
+  debouncedUpdate();
+}
+
+async function runUploadSlice() {
+  if (!state.uploadSessionId) return;
+  showLoading('Đang khử nhiễu lát cắt...');
+  try {
+    const params = new URLSearchParams({
+      session_id: state.uploadSessionId,
+      slice_idx: state.uploadSliceIdx,
+      hu_min: state.huMin,
+      hu_max: state.huMax
+    });
+    const r = await fetch(`/api/upload_slice?${params}`);
+    const data = await r.json();
+    renderInferImages(data);
+    // Hide diff/edge for upload since NDCT is not available
+    document.getElementById('diffSection').classList.add('hidden');
+    document.getElementById('edgeSection').classList.add('hidden');
+    // Hide metrics table since we don't calculate metrics
+    document.getElementById('metricsTableSection').classList.add('hidden');
+    
+    // Reset metric cards
+    ['mc-ssim-edr', 'mc-psnr-edr', 'mc-edge-edr', 'mc-vif-edr'].forEach(id => {
+      const card = document.getElementById(id);
+      if (card) {
+        card.querySelector('.metric-value').textContent = '—';
+        card.querySelector('.metric-delta').textContent = '—';
+      }
+    });
+  } catch (e) {
+    console.error('Upload slice failed:', e);
   } finally {
     hideLoading();
   }
@@ -587,4 +694,278 @@ function showLoading(text = 'Đang xử lý...') {
 }
 function hideLoading() {
   document.getElementById('loadingOverlay').classList.add('hidden');
+}
+
+// ── Sybil Prediction (SSE) ─────────────────────────────────────────────────
+let sybilEventSource = null;
+let sybilChartInstance = null;
+
+function runSybilPrediction() {
+  const btn = document.getElementById('sybilBtn');
+  btn.disabled = true;
+
+  // Show modal, reset state
+  const modal = document.getElementById('sybilModal');
+  modal.classList.remove('hidden');
+  document.getElementById('sybilProgress').style.display = 'block';
+  document.getElementById('sybilResults').classList.add('hidden');
+  document.getElementById('sybilCloseBtn').classList.add('hidden');
+  document.getElementById('sybilProgressBar').style.width = '0%';
+  document.getElementById('sybilPercentText').textContent = '0%';
+  document.getElementById('sybilStageText').textContent = 'Đang khởi tạo...';
+
+  // Open SSE
+  let url = `/api/predict_sybil?pat_idx=${state.patIdx}`;
+  if (state.mode === 'upload' && state.uploadSessionId) {
+    url = `/api/predict_sybil?session_id=${state.uploadSessionId}`;
+  } else if (state.mode === 'upload' && !state.uploadSessionId) {
+    alert("Vui lòng tải lên một thư mục DICOM trước khi chạy Sybil!");
+    btn.disabled = false;
+    modal.classList.add('hidden');
+    return;
+  }
+  sybilEventSource = new EventSource(url);
+
+  sybilEventSource.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+
+    // Update progress bar
+    const pct = data.percent || 0;
+    document.getElementById('sybilProgressBar').style.width = pct + '%';
+    document.getElementById('sybilPercentText').textContent = Math.round(pct) + '%';
+    document.getElementById('sybilStageText').textContent = data.message || '';
+
+    if (data.stage === 'done') {
+      sybilEventSource.close();
+      sybilEventSource = null;
+      btn.disabled = false;
+
+      // Show results
+      document.getElementById('sybilProgress').style.display = 'none';
+      document.getElementById('sybilResults').classList.remove('hidden');
+      document.getElementById('sybilCloseBtn').classList.remove('hidden');
+      renderSybilResults(data.results);
+    }
+  };
+
+  sybilEventSource.onerror = function(err) {
+    console.error('Sybil SSE error:', err);
+    sybilEventSource.close();
+    sybilEventSource = null;
+    btn.disabled = false;
+    document.getElementById('sybilStageText').textContent = '❌ Lỗi kết nối. Hãy thử lại.';
+    document.getElementById('sybilCloseBtn').classList.remove('hidden');
+  };
+}
+
+function closeSybilModal() {
+  document.getElementById('sybilModal').classList.add('hidden');
+  if (sybilEventSource) {
+    sybilEventSource.close();
+    sybilEventSource = null;
+  }
+  document.getElementById('sybilBtn').disabled = false;
+}
+
+function renderSybilResults(results) {
+  // Patient info
+  const info = document.getElementById('sybilPatientInfo');
+  info.innerHTML = `📋 Bệnh nhân: <strong>${results.patient_id}</strong> — ${results.total_slices} lát cắt đã phân tích`;
+
+  // Table
+  const tbody = document.getElementById('sybilTableBody');
+  tbody.innerHTML = '';
+
+  const rows = [
+    { label: '🔴 LDCT (Gốc)',     scores: results.scores_ldct,   cls: 'row-ldct' },
+    { label: '🔵 RED-CNN',         scores: results.scores_redcnn, cls: 'row-redcnn' },
+    { label: '🟢 EDR-REDNet',      scores: results.scores_edr,    cls: 'row-edr' },
+  ];
+
+  // For each year, find the lowest risk (best)
+  const numYears = Math.max(
+    results.scores_ldct?.length || 0,
+    results.scores_redcnn?.length || 0,
+    results.scores_edr?.length || 0
+  );
+
+  const bestPerYear = [];
+  for (let y = 0; y < numYears; y++) {
+    const vals = rows.map(r => {
+      const s = r.scores?.[y];
+      return (typeof s === 'number') ? s : Infinity;
+    });
+    bestPerYear.push(Math.min(...vals));
+  }
+
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.className = row.cls;
+    let html = `<td>${row.label}</td>`;
+    const scores = row.scores || [];
+    for (let y = 0; y < numYears; y++) {
+      const val = scores[y];
+      if (typeof val === 'number') {
+        const isBest = Math.abs(val - bestPerYear[y]) < 0.001;
+        html += `<td class="${isBest ? 'cell-best' : ''}">${val.toFixed(2)}%</td>`;
+      } else {
+        html += `<td style="color:#ef4444;font-size:0.7rem">${val || '—'}</td>`;
+      }
+    }
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
+
+  // Chart
+  renderSybilChart(results, numYears);
+}
+
+function renderSybilChart(results, numYears) {
+  const canvas = document.getElementById('sybilChart');
+  if (sybilChartInstance) {
+    sybilChartInstance.destroy();
+    sybilChartInstance = null;
+  }
+
+  const labels = Array.from({length: numYears}, (_, i) => `Năm ${i + 1}`);
+
+  const datasets = [
+    {
+      label: 'LDCT (Gốc)',
+      data: (results.scores_ldct || []).map(v => typeof v === 'number' ? v : null),
+      borderColor: '#f87171',
+      backgroundColor: 'rgba(248, 113, 113, 0.15)',
+      borderWidth: 2.5,
+      pointRadius: 5,
+      pointBackgroundColor: '#f87171',
+      tension: 0.3,
+      fill: true,
+    },
+    {
+      label: 'RED-CNN',
+      data: (results.scores_redcnn || []).map(v => typeof v === 'number' ? v : null),
+      borderColor: '#60a5fa',
+      backgroundColor: 'rgba(96, 165, 250, 0.15)',
+      borderWidth: 2.5,
+      pointRadius: 5,
+      pointBackgroundColor: '#60a5fa',
+      tension: 0.3,
+      fill: true,
+    },
+    {
+      label: 'EDR-REDNet',
+      data: (results.scores_edr || []).map(v => typeof v === 'number' ? v : null),
+      borderColor: '#34d399',
+      backgroundColor: 'rgba(52, 211, 153, 0.15)',
+      borderWidth: 2.5,
+      pointRadius: 5,
+      pointBackgroundColor: '#34d399',
+      tension: 0.3,
+      fill: true,
+    },
+  ];
+
+  sybilChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: '#cbd5e1', font: { size: 11 } }
+        },
+        title: {
+          display: true,
+          text: 'Nguy cơ Ung thư phổi theo Năm (%)',
+          color: '#e8edf5',
+          font: { size: 13, weight: 'bold' }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(2)}%`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#8892a4' },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#8892a4', callback: v => v + '%' },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          title: { display: true, text: 'Nguy cơ (%)', color: '#8892a4' }
+        }
+      }
+    }
+  });
+}
+
+// ── Sybil History ──────────────────────────────────────────────────────────
+let sybilHistoryData = [];
+
+async function showSybilHistory() {
+  document.getElementById('sybilHistoryModal').classList.remove('hidden');
+  const listEl = document.getElementById('sybilHistoryList');
+  listEl.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:2rem;">Đang tải lịch sử...</div>';
+  
+  try {
+    const r = await fetch('/api/sybil_history');
+    if (!r.ok) throw new Error('Failed to fetch history');
+    sybilHistoryData = await r.json();
+    
+    if (sybilHistoryData.length === 0) {
+      listEl.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:2rem;">Chưa có lịch sử dự đoán nào.</div>';
+      return;
+    }
+    
+    let html = '';
+    sybilHistoryData.forEach((item, index) => {
+      const riskLdct = item.scores_ldct && item.scores_ldct.length > 0 ? (typeof item.scores_ldct[0] === 'number' ? item.scores_ldct[0].toFixed(2) + '%' : 'Error') : '—';
+      const riskEdr = item.scores_edr && item.scores_edr.length > 0 ? (typeof item.scores_edr[0] === 'number' ? item.scores_edr[0].toFixed(2) + '%' : 'Error') : '—';
+      
+      html += `
+        <div style="background:#1e293b; border:1px solid #334155; border-radius:8px; padding:12px 16px; margin-bottom:10px; cursor:pointer; transition:0.2s;" 
+             onmouseover="this.style.borderColor='#4f46e5'" 
+             onmouseout="this.style.borderColor='#334155'"
+             onclick="viewHistoryItem(${index})">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div style="font-weight:600; color:#e8edf5; font-size:1.05rem;">Bệnh nhân: ${item.patient_id}</div>
+            <div style="color:#94a3b8; font-size:0.85rem;">🕒 ${item.timestamp || ''}</div>
+          </div>
+          <div style="display:flex; gap:15px; color:#94a3b8; font-size:0.9rem;">
+            <div>Số lát cắt: <span style="color:#e8edf5;">${item.total_slices}</span></div>
+            <div>Rủi ro Năm 1 (Gốc): <span style="color:#f87171;">${riskLdct}</span></div>
+            <div>Rủi ro Năm 1 (EDR): <span style="color:#34d399;">${riskEdr}</span></div>
+          </div>
+        </div>
+      `;
+    });
+    listEl.innerHTML = html;
+  } catch (e) {
+    console.error(e);
+    listEl.innerHTML = '<div style="color:#ef4444;text-align:center;padding:2rem;">Lỗi tải lịch sử!</div>';
+  }
+}
+
+function closeSybilHistoryModal() {
+  document.getElementById('sybilHistoryModal').classList.add('hidden');
+}
+
+function viewHistoryItem(index) {
+  const data = sybilHistoryData[index];
+  if (!data) return;
+  
+  closeSybilHistoryModal();
+  
+  // Show sybil modal directly with results
+  const modal = document.getElementById('sybilModal');
+  modal.classList.remove('hidden');
+  document.getElementById('sybilProgress').style.display = 'none';
+  document.getElementById('sybilResults').classList.remove('hidden');
+  document.getElementById('sybilCloseBtn').classList.remove('hidden');
+  
+  renderSybilResults(data);
 }

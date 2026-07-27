@@ -38,29 +38,29 @@
         </select>
       </div>
       <div class="section-label mt-3">Lát cắt (Slice)</div>
-      <div class="slider-row">
-        <input type="range" id="sliceSlider" min="0" max="100" value="0" oninput="onSliceChange(this.value)" />
-        <span class="slider-val" id="sliceVal">0</span>
+      <div class="slider-row" style="display:flex; gap:10px; align-items:center;">
+        <input type="range" id="sliceSlider" min="0" max="100" value="0" oninput="onSliceChange(this.value)" style="flex:1;" />
+        <input type="number" id="sliceVal" min="0" max="100" value="0" onchange="onSliceInput(this.value)" style="width: 55px; background: #1e293b; color: #5eead4; border: 1px solid #334155; border-radius: 4px; padding: 2px 4px; text-align: center; outline: none; font-family: monospace;" />
       </div>
     </div>
 
     <!-- Upload Controls -->
     <div id="uploadControls" class="sidebar-section hidden">
-      <div class="section-label">File LDCT (Đầu vào)</div>
-      <label class="upload-label" for="ldctFile">
+      <div class="section-label">Thư mục DICOM Bệnh nhân</div>
+      <label class="upload-label" for="ldctFolder">
         <span class="upload-icon-sm">📁</span>
-        <span id="ldctFileName">Chọn file .dcm</span>
-        <input type="file" id="ldctFile" accept=".dcm" onchange="onFileSelect('ldct', this)" hidden />
+        <span id="ldctFolderName">Chọn thư mục .dcm</span>
+        <input type="file" id="ldctFolder" webkitdirectory directory multiple onchange="onFolderSelect(this)" hidden />
       </label>
-      <div class="section-label mt-3">File NDCT (Tùy chọn)</div>
-      <label class="upload-label" for="ndctFile">
-        <span class="upload-icon-sm">📁</span>
-        <span id="ndctFileName">Chọn file .dcm</span>
-        <input type="file" id="ndctFile" accept=".dcm" onchange="onFileSelect('ndct', this)" hidden />
-      </label>
-      <button class="primary-btn mt-3 w-full" id="uploadBtn" onclick="runUpload()" disabled>
-        <span>▶ Chạy Inference</span>
-      </button>
+      
+      <!-- Upload slice slider (hidden until upload succeeds) -->
+      <div id="uploadSliderContainer" class="hidden mt-3">
+        <div class="section-label">Lát cắt (Slice)</div>
+        <div class="slider-row" style="display:flex; gap:10px; align-items:center;">
+          <input type="range" id="uploadSliceSlider" min="0" max="100" value="0" oninput="onUploadSliceChange(this.value)" style="flex:1;" />
+          <input type="number" id="uploadSliceVal" min="0" max="100" value="0" onchange="onUploadSliceInput(this.value)" style="width: 55px; background: #1e293b; color: #5eead4; border: 1px solid #334155; border-radius: 4px; padding: 2px 4px; text-align: center; outline: none; font-family: monospace;" />
+        </div>
+      </div>
     </div>
 
     <div class="sidebar-section">
@@ -83,10 +83,75 @@
       </label>
     </div>
 
+    <div class="sidebar-section">
+      <button class="sybil-btn" id="sybilBtn" onclick="runSybilPrediction()">
+        🧠 Dự đoán Ung thư (Sybil)
+      </button>
+      <button class="secondary-btn w-full mt-2" id="sybilHistoryBtn" onclick="showSybilHistory()" style="background:#1e293b; color:#cbd5e1; border:1px solid #334155; padding:0.6rem; border-radius:6px; cursor:pointer; font-weight:500; font-size:0.9rem; transition:0.2s;">
+        🕒 Lịch sử Dự đoán
+      </button>
+      <div class="sybil-hint">Khử nhiễu toàn bộ lát cắt + Sybil AI</div>
+    </div>
+
     <div class="sidebar-section sidebar-info" id="deviceInfo">
       <div class="info-badge" id="deviceBadge">⚙️ Đang kết nối...</div>
     </div>
   </aside>
+
+  <!-- ── SYBIL MODAL ──────────────────────────────────────────────────────── -->
+  <div class="sybil-modal-overlay hidden" id="sybilModal">
+    <div class="sybil-modal">
+      <div class="sybil-modal-header">
+        <span class="sybil-modal-icon">🧠</span>
+        <h2 class="sybil-modal-title">Dự đoán Ung thư Phổi — Sybil AI</h2>
+        <button class="sybil-modal-close hidden" id="sybilCloseBtn" onclick="closeSybilModal()">✕</button>
+      </div>
+
+      <!-- Progress Section -->
+      <div id="sybilProgress">
+        <div class="sybil-progress-label" id="sybilStageText">Đang chuẩn bị...</div>
+        <div class="sybil-progress-bar-track">
+          <div class="sybil-progress-bar-fill" id="sybilProgressBar" style="width: 0%"></div>
+        </div>
+        <div class="sybil-progress-percent" id="sybilPercentText">0%</div>
+      </div>
+
+      <!-- Results Section (hidden until done) -->
+      <div id="sybilResults" class="hidden">
+        <div class="sybil-patient-info" id="sybilPatientInfo"></div>
+        <table class="sybil-results-table">
+          <thead>
+            <tr>
+              <th>Nguồn ảnh</th>
+              <th>Năm 1</th>
+              <th>Năm 2</th>
+              <th>Năm 3</th>
+              <th>Năm 4</th>
+              <th>Năm 5</th>
+              <th>Năm 6</th>
+            </tr>
+          </thead>
+          <tbody id="sybilTableBody"></tbody>
+        </table>
+        <div class="sybil-chart-container">
+          <canvas id="sybilChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ── SYBIL HISTORY MODAL ────────────────────────────────────────────────── -->
+  <div class="sybil-modal-overlay hidden" id="sybilHistoryModal">
+    <div class="sybil-modal">
+      <div class="sybil-modal-header">
+        <span class="sybil-modal-icon">🕒</span>
+        <h2 class="sybil-modal-title">Lịch sử Dự đoán Sybil</h2>
+        <button class="sybil-modal-close" onclick="closeSybilHistoryModal()">✕</button>
+      </div>
+      <div class="sybil-history-container" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+        <div id="sybilHistoryList">Đang tải lịch sử...</div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── MAIN CONTENT ──────────────────────────────────────────────────────── -->
   <div class="main-wrapper">
@@ -316,6 +381,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>
