@@ -22,6 +22,23 @@ class LDCTMayo(Dataset):
         random.seed(args.seed)
 
         self.path = args.datafolder
+
+        # Tự động phát hiện nếu thư mục data bị bọc bởi subfolder từ Kaggle (ví dụ: data/aapm-mayo-clinic/... hoặc data/versions/1/...)
+        if os.path.exists(self.path):
+            curr = self.path
+            for _ in range(3):
+                items = os.listdir(curr)
+                if not any(k in items for k in ["C002", "C004", "L004"]) and len(items) >= 1:
+                    subdirs = [os.path.join(curr, d) for d in items if os.path.isdir(os.path.join(curr, d))]
+                    if len(subdirs) == 1:
+                        curr = subdirs[0]
+                    else:
+                        for sd in subdirs:
+                            if any(k in os.listdir(sd) for k in ["C002", "C004", "L004"]):
+                                curr = sd
+                                break
+            self.path = curr
+
         if not hasattr(args, "eval_patchsize"):
             args.eval_patchsize = 128
         self.patchsize = (
@@ -56,6 +73,14 @@ class LDCTMayo(Dataset):
             return self.patient_cache[folder_rel_path]
 
         folder_abs_path = os.path.join(self.path, folder_rel_path[2:])
+        if not os.path.exists(folder_abs_path):
+            # Fallback search if path separator or nesting differs
+            rel = folder_rel_path[2:].replace("\\", "/").strip("/")
+            for root, dirs, files in os.walk(self.path):
+                if root.endswith(rel) or rel in root.replace("\\", "/"):
+                    folder_abs_path = root
+                    break
+
         if not os.path.exists(folder_abs_path):
             return []
 
