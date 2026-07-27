@@ -24,9 +24,15 @@ Cách sử dụng:
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import time
+
+# Auto-detect PyTorch python environment (prefer conda if available)
+PYTHON_BIN = sys.executable
+if os.path.exists("/opt/conda/bin/python"):
+    PYTHON_BIN = "/opt/conda/bin/python"
 
 # 10 seeds chuẩn mực cho nghiên cứu
 SEEDS = [42, 1339, 2024, 101, 202, 303, 404, 505, 606, 707]
@@ -60,7 +66,7 @@ def train_redcnn():
     print("============================================================")
     for seed in SEEDS:
         print(f"\n--- Training RED-CNN Seed {seed} ---")
-        cmd = f'{sys.executable} -m ldctbench.scripts.train --config configs/redcnn.yaml --seed {seed}'
+        cmd = f'{PYTHON_BIN} -m ldctbench.scripts.train --config configs/redcnn.yaml --seed {seed}'
         log = f"logs/training/redcnn_seed_{seed}.log"
         run_command(cmd, log_file=log)
 
@@ -71,7 +77,7 @@ def train_hq_redcnn():
     print("============================================================")
     for seed in SEEDS:
         print(f"\n--- Training HQ-REDCNN Seed {seed} ---")
-        cmd = f'{sys.executable} -m ldctbench.scripts.train --config configs/edrrednet.yaml --seed {seed}'
+        cmd = f'{PYTHON_BIN} -m ldctbench.scripts.train --config configs/edrrednet.yaml --seed {seed}'
         log = f"logs/training/hq_redcnn_seed_{seed}.log"
         run_command(cmd, log_file=log)
 
@@ -84,21 +90,21 @@ def train_ablation():
     # A1: RED-CNN + Charbonnier Loss (No Sobel loss, No Sobel input, No dilated blocks)
     for seed in ABLATION_SEEDS:
         print(f"\n--- Training Ablation A1 (Charbonnier only) Seed {seed} ---")
-        cmd = f'{sys.executable} -m ldctbench.scripts.train --config configs/edrrednet.yaml --seed {seed} --loss_alpha 0.0 --use_sobel_input False --num_edge_blocks 0 --wandbtag ablation_a1'
+        cmd = f'{PYTHON_BIN} -m ldctbench.scripts.train --config configs/edrrednet.yaml --seed {seed} --loss_alpha 0.0 --use_sobel_input False --num_edge_blocks 0 --wandbtag ablation_a1'
         log = f"logs/training/ablation_a1_seed_{seed}.log"
         run_command(cmd, log_file=log)
 
     # A2: A1 + Sobel Loss (Charbonnier + Sobel loss, No Sobel input, No dilated blocks)
     for seed in ABLATION_SEEDS:
         print(f"\n--- Training Ablation A2 (Charb+Sobel loss) Seed {seed} ---")
-        cmd = f'{sys.executable} -m ldctbench.scripts.train --config configs/edrrednet.yaml --seed {seed} --loss_alpha 0.1 --use_sobel_input False --num_edge_blocks 0 --wandbtag ablation_a2'
+        cmd = f'{PYTHON_BIN} -m ldctbench.scripts.train --config configs/edrrednet.yaml --seed {seed} --loss_alpha 0.1 --use_sobel_input False --num_edge_blocks 0 --wandbtag ablation_a2'
         log = f"logs/training/ablation_a2_seed_{seed}.log"
         run_command(cmd, log_file=log)
 
     # A3: A2 + Edge Injection (Sobel input, No dilated blocks)
     for seed in ABLATION_SEEDS:
         print(f"\n--- Training Ablation A3 (Edge injection, no dilated blocks) Seed {seed} ---")
-        cmd = f'{sys.executable} -m ldctbench.scripts.train --config configs/edrrednet.yaml --seed {seed} --loss_alpha 0.1 --use_sobel_input True --num_edge_blocks 0 --wandbtag ablation_a3'
+        cmd = f'{PYTHON_BIN} -m ldctbench.scripts.train --config configs/edrrednet.yaml --seed {seed} --loss_alpha 0.1 --use_sobel_input True --num_edge_blocks 0 --wandbtag ablation_a3'
         log = f"logs/training/ablation_a3_seed_{seed}.log"
         run_command(cmd, log_file=log)
 
