@@ -163,9 +163,16 @@ class Model(nn.Module):
         # ── Tích hợp edge map vào bottleneck (nếu bật) ──────────────────────────
         if self.use_sobel_input:
             edge_map = self.sobel(x)  # (B, 4, H, W)
-            edge_proj = self.proj_edge(
-                F.interpolate(edge_map, size=out.shape[2:], mode="bilinear", align_corners=False)
-            )  # (B, 96, H', W')
+            # Exact central crop for coordinate alignment (resolving valid convolution spatial shift)
+            diff_h = edge_map.shape[2] - out.shape[2]
+            diff_w = edge_map.shape[3] - out.shape[3]
+            pad_h = diff_h // 2
+            pad_w = diff_w // 2
+            if diff_h > 0 and diff_w > 0:
+                edge_cropped = edge_map[:, :, pad_h : edge_map.shape[2] - pad_h, pad_w : edge_map.shape[3] - pad_w]
+            else:
+                edge_cropped = edge_map
+            edge_proj = self.proj_edge(edge_cropped)  # (B, 96, H', W')
             out = out + edge_proj  # ADD (không concat để không tăng params decoder)
 
         # ── EdgeDilatedResidualBlocks ────────────────────────────────────────────

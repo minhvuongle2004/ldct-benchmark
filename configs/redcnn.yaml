@@ -1,18 +1,28 @@
+# configs/redcnn.yaml
+# RED-CNN Baseline — Matched training protocol for fair comparison with HQ-REDCNN
+# Tất cả hyperparameters giống hệt edrrednet.yaml (trừ trainer/loss/architecture)
+
+trainer: redcnn
+seed: 42                          # Override bằng --seed khi chạy từng run
+datafolder: data
+
+# Optimizer (KHỚP 100% với HQ-REDCNN)
+optimizer: adam
+lr: 9.583e-05
 adam_b1: 0.9
 adam_b2: 0.999
-cuda: true
-data_norm: meanstd
-data_subset: 1.0
-datafolder: data
-devices: 0
-dryrun: true
-iterations_before_val: 1000
-lr: 9.583417460320728e-05
-max_iterations: 92994
+
+# Training (KHỚP 100% với HQ-REDCNN)
 mbs: 16
-num_workers: 4
-optimizer: adam
+max_iterations: 40000
+data_subset: 1.0
 patchsize: 128
-seed: 1339
-trainer: redcnn
+iterations_before_val: 1000
 valsamples: 8
+
+# Data (KHỚP 100% với HQ-REDCNN)
+data_norm: meanstd
+num_workers: 4
+cuda: true
+devices: 0
+dryrun: false
