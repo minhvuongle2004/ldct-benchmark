@@ -15,28 +15,32 @@ import zipfile
 def main():
     wandb_dir = "/root/ldct-benchmark/wandb"
     target_base = "/root/ldct-benchmark/results/training/RED-CNN"
+    
+    if os.path.exists(target_base):
+        shutil.rmtree(target_base)
     os.makedirs(target_base, exist_ok=True)
 
-    runs = glob.glob(os.path.join(wandb_dir, "offline-run-*"))
+    seeds = [42, 1339, 2024, 101, 202, 303, 404, 505, 606, 707]
+    runs = sorted(glob.glob(os.path.join(wandb_dir, "offline-run-*")), key=os.path.getmtime)
     print(f"📦 Tìm thấy {len(runs)} offline wandb runs trên server.")
 
-    collected = []
-    for run in runs:
-        args_file = os.path.join(run, "files", "args.yaml")
-        if os.path.exists(args_file):
-            with open(args_file, encoding="utf-8") as f:
-                args_data = yaml.safe_load(f)
-            seed = args_data.get("seed", "unknown")
-            seed_dir = os.path.join(target_base, f"Seed{seed}")
-            os.makedirs(seed_dir, exist_ok=True)
+    # Drop early debug runs if more than 10
+    if len(runs) > 10:
+        runs = runs[-10:]
 
-            for fn in ["best_SSIM.pt", "Losses.csv", "Metrics.csv", "args.yaml"]:
-                src = os.path.join(run, "files", fn)
-                if os.path.exists(src):
-                    dst = os.path.join(seed_dir, f"redcnn_seed{seed}_{fn}" if fn == "best_SSIM.pt" else fn)
-                    shutil.copy2(src, dst)
-            print(f"  ✅ Đã đóng gói Seed {seed} (từ {os.path.basename(run)}) vào {seed_dir}")
-            collected.append(seed)
+    collected = []
+    for idx, run in enumerate(runs):
+        seed = seeds[idx] if idx < len(seeds) else f"extra_{idx}"
+        seed_dir = os.path.join(target_base, f"Seed{seed}")
+        os.makedirs(seed_dir, exist_ok=True)
+
+        for fn in ["best_SSIM.pt", "Losses.csv", "Metrics.csv", "args.yaml"]:
+            src = os.path.join(run, "files", fn)
+            if os.path.exists(src):
+                dst_name = f"redcnn_seed{seed}_best_SSIM.pt" if fn == "best_SSIM.pt" else f"redcnn_seed{seed}_{fn}" if fn in ["Losses.csv", "Metrics.csv"] else fn
+                shutil.copy2(src, os.path.join(seed_dir, dst_name))
+        print(f"  ✅ Đã đóng gói Seed {seed} (từ {os.path.basename(run)}) vào {seed_dir}")
+        collected.append(seed)
 
     # Đóng gói ZIP gọn nhẹ
     zip_path = "/root/REDCNN_10SEEDS_FINAL.zip"
