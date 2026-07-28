@@ -20,12 +20,15 @@ def main():
         shutil.rmtree(target_base)
     os.makedirs(target_base, exist_ok=True)
 
-    seeds = [42, 1339, 2024, 101, 202, 303, 404, 505, 606, 707]
     runs = sorted(glob.glob(os.path.join(wandb_dir, "offline-run-*")), key=os.path.getmtime)
     print(f"📦 Tìm thấy {len(runs)} offline wandb runs trên server.")
 
-    if len(runs) > 10:
-        runs = runs[-10:]
+    if len(runs) == 7:
+        seeds = [101, 202, 303, 404, 505, 606, 707]
+    else:
+        seeds = [42, 1339, 2024, 101, 202, 303, 404, 505, 606, 707]
+        if len(runs) > len(seeds):
+            runs = runs[-len(seeds):]
 
     collected = []
     for idx, run in enumerate(runs):

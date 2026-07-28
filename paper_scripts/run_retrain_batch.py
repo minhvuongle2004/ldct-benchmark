@@ -72,11 +72,15 @@ def train_redcnn():
         run_command(cmd, log_file=log)
 
 
+# 7 seeds còn lại cho HQ-REDCNN
+HQ_REDCNN_7SEEDS = [101, 202, 303, 404, 505, 606, 707]
+
+
 def train_hq_redcnn():
     print("\n============================================================")
-    print("🔥 STARTING HQ-REDCNN CENTRAL CROP (10 SEEDS)")
+    print("🔥 STARTING HQ-REDCNN CENTRAL CROP (7 REMAINING SEEDS)")
     print("============================================================")
-    for seed in SEEDS:
+    for seed in HQ_REDCNN_7SEEDS:
         print(f"\n--- Training HQ-REDCNN Seed {seed} ---")
         cmd = f'{PYTHON_BIN} -m ldctbench.scripts.train --config configs/edrrednet.yaml --seed {seed}'
         log = f"logs/training/hq_redcnn_seed_{seed}.log"
