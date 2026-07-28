@@ -35,4 +35,4 @@ valsamples: 8
 data_norm: meanstd
 num_workers: 4       # Dùng 4 khi train trên Kaggle, tăng lên 8 nếu local
 cuda: true
-devices: [0, 1]
+devices: 0
