@@ -20,18 +20,24 @@ def main():
         shutil.rmtree(target_base)
     os.makedirs(target_base, exist_ok=True)
 
-    runs = sorted(glob.glob(os.path.join(wandb_dir, "offline-run-*")), key=os.path.getmtime)
-    print(f"📦 Tìm thấy {len(runs)} offline wandb runs trên server.")
+    seeds = [101, 202, 303, 404, 505, 606, 707]
+    all_runs = sorted(glob.glob(os.path.join(wandb_dir, "offline-run-*")), key=os.path.getmtime)
+    
+    # Filter only full completed runs (with best_SSIM.pt and Losses.csv >= 30 lines)
+    valid_runs = []
+    for r in all_runs:
+        losses_file = os.path.join(r, "files", "Losses.csv")
+        pt_file = os.path.join(r, "files", "best_SSIM.pt")
+        if os.path.exists(losses_file) and os.path.exists(pt_file):
+            with open(losses_file, encoding="utf-8") as f:
+                lines = f.readlines()
+            if len(lines) >= 30:  # At least 30,000+ iterations logged
+                valid_runs.append(r)
 
-    if len(runs) == 7:
-        seeds = [101, 202, 303, 404, 505, 606, 707]
-    else:
-        seeds = [42, 1339, 2024, 101, 202, 303, 404, 505, 606, 707]
-        if len(runs) > len(seeds):
-            runs = runs[-len(seeds):]
+    print(f"📦 Tìm thấy {len(valid_runs)}/7 completed HQ-REDCNN runs (40k iterations) trên server.")
 
     collected = []
-    for idx, run in enumerate(runs):
+    for idx, run in enumerate(valid_runs):
         seed = seeds[idx] if idx < len(seeds) else f"extra_{idx}"
         seed_dir = os.path.join(target_base, f"Seed{seed}")
         os.makedirs(seed_dir, exist_ok=True)
